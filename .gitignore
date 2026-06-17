@@ -2,3 +2,5 @@
 nc-plus-one-seeding.md
 *Zone.Identifier
 db/credentials.py
+__pycache__
+.vscode
