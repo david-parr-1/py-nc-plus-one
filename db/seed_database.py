@@ -1,5 +1,6 @@
 import json
 from psycopg2 import sql
+from psycopg2.extras import execute_values
 from db.connection import get_db_connection
 from db.credentials import dbname, host, password
 
@@ -53,50 +54,30 @@ def create_venues_table(connection):
 
 def extract_json_data(filepath):
     """
-    Fetches JSON data from a file and returns it in list format
+    Fetches JSON data from a file and returns it as a list of tuples. Each tuple represents one
+    row from the source JSON data.
     """
     with open(filepath, "r") as file:
+        records = []
         data = json.load(file)
-        return data
-    
+        for item in data:
+            row_tuple = tuple(
+                item.get(key) for key in item
+            )
+            records.append(row_tuple)
 
-def make_sql_inserts(extracted_data):
-    """
-    Takes a list of data rows which have been extracted from the source data json files
-    and processes them into a format that allows their concatenation into an SQL string for
-    insert into the database
-    """
-    # An error should be raised if the input is not a list
-    if not isinstance(extracted_data, list):
-        raise TypeError(f"Expected input type list. Got {type(extracted_data)}.")
-    
-    # An empty list should be returned if the input list is empty
-    if not extracted_data:
-        return []
-
-    formatted_rows = []
-    for row in extracted_data:
-        row_values = [f"'{row[key]}'" if isinstance(row[key], str) else row[key] for key in row]
-        # row_values = [row[key] for key in row]
-        row_as_string = ", ".join(row_values)
-        sql_format_row = f"({row_as_string})"
-        formatted_rows.append(sql_format_row)
-    
-    all_rows_formatted = ", ".join(formatted_rows)
-    return all_rows_formatted
+        return records
 
 
 def insert_user_data(connection):
     """
-    Takes a database connection and a fully formatted SQL query and executes it to insert user data
-    into the database
+    Takes a database connection and uses it to insert extracted user data from users.json into 
+    the users table.
     """
-    extracted_data = extract_json_data("db/data/users.json")
-    rows_to_insert = make_sql_inserts(extracted_data)
-    query = f"INSERT INTO users (name, email, password) VALUES {rows_to_insert}"
-    # sql_insert_string = create_insert_sql_string(sql_values)
+    records = extract_json_data("db/data/users.json")
+    query = "INSERT INTO users (name, email, password) VALUES %s;"
     with connection.cursor() as curs:
-        curs.execute(query)
+        execute_values(curs, query, records)
 
 
 def seed():
