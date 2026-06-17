@@ -15,3 +15,14 @@ It should then be possible to use the Postgres client to connect to the database
 ```bash
 psql -d nc_plus_one
 ```
+
+## Database Connection
+
+A file `db/credentials.py` will require creation to allow secure management of credentials when connecting to the database through Python.
+The format should be:
+
+```python
+dbname = your_db_name
+host = your_host
+password = your_password
+```
