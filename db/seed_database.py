@@ -32,6 +32,25 @@ def create_user_table(connection):
         curs.execute(query)
 
 
+def create_venues_table(connection):
+    """
+    Uses the provided connection to create the venues table within the database
+    """
+    with connection.cursor() as curs:
+        query = sql.SQL(
+            """
+            CREATE TABLE venues (
+                id SERIAL PRIMARY KEY,
+                name VARCHAR(255) NOT NULL,
+                address TEXT,
+                capacity INT
+            )
+            """
+        )
+
+        curs.execute(query)
+
+
 def extract_json_data(filepath):
     """
     Fetches JSON data from a file and returns it in list format
@@ -83,11 +102,15 @@ def insert_user_data(connection):
 def seed():
     with get_db_connection(dbname=dbname, host=host, password=password) as conn:
     
-        # Drop users table if it already exists
-        drop_db_table(conn, "users")
+        db_tables = ["users", "venues"]
+        
+        # Drop users and venues tables if they already exists
+        for table in db_tables:
+            drop_db_table(conn, table)
 
         # Create users table
         create_user_table(conn)
+        create_venues_table(conn)
         
         # Insert the test user data into the users table
         insert_user_data(conn)
