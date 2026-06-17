@@ -52,6 +52,28 @@ def create_venues_table(connection):
         curs.execute(query)
 
 
+def create_events_table(connection):
+    """
+    Uses the provided connection to create the events table within the database
+    """
+    with connection.cursor() as curs:
+        query = sql.SQL(
+            """
+            CREATE TABLE events (
+                id SERIAL PRIMARY KEY,
+                title VARCHAR(255) NOT NULL,
+                description VARCHAR(255),
+                starts_at TIMESTAMPTZ NOT NULL,
+                ends_at TIMESTAMPTZ NOT NULL,
+                organiser_id INT NOT NULL REFERENCES users(id),
+                venue_id INT NOT NULL REFERENCES venues(id),
+                created_at TIMESTAMPTZ DEFAULT NOW()
+            )
+            """
+        )
+        curs.execute(query)
+
+
 def extract_json_data(filepath):
     """
     Fetches JSON data from a file and returns it as a list of tuples. Each tuple represents one
@@ -94,7 +116,7 @@ def insert_venues_data(connection):
 def seed():
     with get_db_connection(dbname=dbname, host=host, password=password) as conn:
     
-        db_tables = ["users", "venues"]
+        db_tables = ["users", "venues", "events"]
         
         # Drop users and venues tables if they already exists
         for table in db_tables:
@@ -103,6 +125,7 @@ def seed():
         # Create users table
         create_user_table(conn)
         create_venues_table(conn)
+        create_events_table(conn)
         
         # Insert the test user data into the users table
         insert_user_data(conn)
