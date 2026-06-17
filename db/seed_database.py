@@ -62,7 +62,7 @@ def extract_json_data(filepath):
         data = json.load(file)
         for item in data:
             row_tuple = tuple(
-                item.get(key) for key in item
+                item.get(key, None) for key in item
             )
             records.append(row_tuple)
 
@@ -76,6 +76,17 @@ def insert_user_data(connection):
     """
     records = extract_json_data("db/data/users.json")
     query = "INSERT INTO users (name, email, password) VALUES %s;"
+    with connection.cursor() as curs:
+        execute_values(curs, query, records)
+
+
+def insert_venues_data(connection):
+    """
+    Takes a database connection and uses it to insert extracted venues data from venues.json into 
+    the users table.
+    """
+    records = extract_json_data("db/data/venues.json")
+    query = "INSERT INTO venues (name, address, capacity) VALUES %s;"
     with connection.cursor() as curs:
         execute_values(curs, query, records)
 
@@ -95,6 +106,7 @@ def seed():
         
         # Insert the test user data into the users table
         insert_user_data(conn)
+        insert_venues_data(conn)
 
 if __name__ == "__main__":
     seed()
