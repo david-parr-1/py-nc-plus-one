@@ -113,10 +113,23 @@ def insert_venues_data(connection):
         execute_values(curs, query, records)
 
 
+def insert_events_data(connection):
+    """
+    Takes a database connection and uses it to insert extracted events data from events.json into 
+    the users table.
+    """
+    records = extract_json_data("db/data/events.json")
+    query = "INSERT INTO events (title, description, starts_at, ends_at, organiser_id, venue_id) VALUES %s;"
+    with connection.cursor() as curs:
+        execute_values(curs, query, records)
+
+
 def seed():
     with get_db_connection(dbname=dbname, host=host, password=password) as conn:
     
-        db_tables = ["users", "venues", "events"]
+        # Dependendent tables (events, rsvps) need to be dropped first as they have foreign keys
+        # from the users and venues tables.
+        db_tables = ["events", "users", "venues"]
         
         # Drop users and venues tables if they already exists
         for table in db_tables:
@@ -130,6 +143,7 @@ def seed():
         # Insert the test user data into the users table
         insert_user_data(conn)
         insert_venues_data(conn)
+        insert_events_data(conn)
 
 if __name__ == "__main__":
     seed()
