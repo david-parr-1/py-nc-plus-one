@@ -74,6 +74,24 @@ def create_events_table(connection):
         curs.execute(query)
 
 
+def create_rsvps_table(connection):
+    """
+    Uses the provided connection to create the events table within the database
+    """
+    with connection.cursor() as curs:
+        query =sql.SQL(
+            """
+            CREATE TABLE rsvps (
+                id SERIAL PRIMARY KEY,
+                attendee_id INTEGER REFERENCES users(id),
+                event_id INTEGER REFERENCES events(id),
+                created_at TIMESTAMPTZ DEFAULT NOW()
+            )
+            """
+        )
+        curs.execute(query)    
+
+
 def extract_json_data(filepath):
     """
     Fetches JSON data from a file and returns it as a list of tuples. Each tuple represents one
@@ -124,12 +142,23 @@ def insert_events_data(connection):
         execute_values(curs, query, records)
 
 
+def insert_rsvps_data(connection):
+    """
+    Takes a database connection and uses it to insert extracted rsvps data from rsvps.json into 
+    the users table.
+    """
+    records = extract_json_data("db/data/rsvps.json")
+    query = "INSERT INTO rsvps (attendee_id, event_id) VALUES %s;"
+    with connection.cursor() as curs:
+        execute_values(curs, query, records)
+
+
 def seed():
     with get_db_connection(dbname=dbname, host=host, password=password) as conn:
     
-        # Dependendent tables (events, rsvps) need to be dropped first as they have foreign keys
+        # Dependendent tables (rsvps, events) need to be dropped first as they have foreign keys
         # from the users and venues tables.
-        db_tables = ["events", "users", "venues"]
+        db_tables = ["rsvps", "events", "users", "venues"]
         
         # Drop users and venues tables if they already exists
         for table in db_tables:
@@ -139,11 +168,13 @@ def seed():
         create_user_table(conn)
         create_venues_table(conn)
         create_events_table(conn)
+        create_rsvps_table(conn)
         
         # Insert the test user data into the users table
         insert_user_data(conn)
         insert_venues_data(conn)
         insert_events_data(conn)
+        insert_rsvps_data(conn)
 
 if __name__ == "__main__":
     seed()
