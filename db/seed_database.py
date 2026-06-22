@@ -45,7 +45,7 @@ def create_venues_table(connection):
                 name VARCHAR(255) NOT NULL,
                 address TEXT,
                 capacity INT
-            )
+            );
             """
         )
 
@@ -68,7 +68,7 @@ def create_events_table(connection):
                 organiser_id INT NOT NULL REFERENCES users(id),
                 venue_id INT NOT NULL REFERENCES venues(id),
                 created_at TIMESTAMPTZ DEFAULT NOW()
-            )
+            );
             """
         )
         curs.execute(query)
@@ -86,7 +86,7 @@ def create_rsvps_table(connection):
                 attendee_id INTEGER REFERENCES users(id),
                 event_id INTEGER REFERENCES events(id),
                 created_at TIMESTAMPTZ DEFAULT NOW()
-            )
+            );
             """
         )
         curs.execute(query)    
