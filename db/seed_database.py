@@ -97,16 +97,22 @@ def extract_json_data(filepath):
     Fetches JSON data from a file and returns it as a list of tuples. Each tuple represents one
     row from the source JSON data.
     """
-    with open(filepath, "r") as file:
-        records = []
-        data = json.load(file)
-        for item in data:
-            row_tuple = tuple(
-                item.get(key, None) for key in item
-            )
-            records.append(row_tuple)
 
-        return records
+    with open(filepath, "r") as file:
+        data = json.load(file)
+
+        return data
+    
+
+def format_json_as_values(json_data):
+    if not isinstance(json_data, list):
+        raise TypeError("Input must be type list")
+    values = []
+    for item in json_data:
+        row_tuple = tuple(item.get(key, None) for key in item)
+        values.append(row_tuple)
+
+    return values
 
 
 def insert_user_data(connection):
@@ -114,10 +120,11 @@ def insert_user_data(connection):
     Takes a database connection and uses it to insert extracted user data from users.json into 
     the users table.
     """
-    records = extract_json_data("db/data/users.json")
+    source_data = extract_json_data("db/data/users.json")
+    seed_rows = format_json_as_values(source_data)
     query = "INSERT INTO users (name, email, password) VALUES %s;"
     with connection.cursor() as curs:
-        execute_values(curs, query, records)
+        execute_values(curs, query, seed_rows)
 
 
 def insert_venues_data(connection):
@@ -125,10 +132,11 @@ def insert_venues_data(connection):
     Takes a database connection and uses it to insert extracted venues data from venues.json into 
     the users table.
     """
-    records = extract_json_data("db/data/venues.json")
+    source_data = extract_json_data("db/data/venues.json")
+    seed_rows = format_json_as_values(source_data)
     query = "INSERT INTO venues (name, address, capacity) VALUES %s;"
     with connection.cursor() as curs:
-        execute_values(curs, query, records)
+        execute_values(curs, query, seed_rows)
 
 
 def insert_events_data(connection):
@@ -136,10 +144,11 @@ def insert_events_data(connection):
     Takes a database connection and uses it to insert extracted events data from events.json into 
     the users table.
     """
-    records = extract_json_data("db/data/events.json")
+    source_data = extract_json_data("db/data/events.json")
+    seed_rows = format_json_as_values(source_data)
     query = "INSERT INTO events (title, description, starts_at, ends_at, organiser_id, venue_id) VALUES %s;"
     with connection.cursor() as curs:
-        execute_values(curs, query, records)
+        execute_values(curs, query, seed_rows)
 
 
 def insert_rsvps_data(connection):
@@ -147,10 +156,11 @@ def insert_rsvps_data(connection):
     Takes a database connection and uses it to insert extracted rsvps data from rsvps.json into 
     the users table.
     """
-    records = extract_json_data("db/data/rsvps.json")
+    source_data = extract_json_data("db/data/rsvps.json")
+    seed_rows = format_json_as_values(source_data)
     query = "INSERT INTO rsvps (attendee_id, event_id) VALUES %s;"
     with connection.cursor() as curs:
-        execute_values(curs, query, records)
+        execute_values(curs, query, seed_rows)
 
 
 def seed():
