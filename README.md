@@ -18,7 +18,7 @@ psql -d nc_plus_one
 
 ## Database Connection
 
-A .env file will require creation to allow secure management of credentials when connecting to the database through Python.
+An `.env` file will require creation to allow secure management of credentials when connecting to the database through Python.
 The format should be:
 
 ```none
