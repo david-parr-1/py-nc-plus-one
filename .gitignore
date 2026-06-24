@@ -5,3 +5,5 @@ db/credentials.py
 __pycache__
 .vscode
 portfolio_nc_plus_one.md
+.env
+ 

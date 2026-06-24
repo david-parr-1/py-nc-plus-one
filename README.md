@@ -18,11 +18,11 @@ psql -d nc_plus_one
 
 ## Database Connection
 
-A file `db/credentials.py` will require creation to allow secure management of credentials when connecting to the database through Python.
+A .env file will require creation to allow secure management of credentials when connecting to the database through Python.
 The format should be:
 
-```python
-dbname = your_db_name
-host = your_host
-password = your_password
+```none
+DB_NAME=your_db_name
+HOST=your_host
+PASSWORD=your_password
 ```
