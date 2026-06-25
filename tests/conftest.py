@@ -3,6 +3,7 @@ from db.connection import get_db_connection
 from psycopg2 import sql
 from psycopg2.extras import execute_values
 from datetime import datetime, timezone
+from auth.auth import hash_password
 
 
 @pytest.fixture(scope="session")
@@ -159,3 +160,35 @@ def add_test_data(database_with_schema):
             query = sql.SQL("TRUNCATE TABLE {} RESTART IDENTITY CASCADE;").format(sql.Identifier(table))
             cur.execute(query)
 
+
+@pytest.fixture(scope="function")
+def user_with_hashed_password(database_with_schema):
+    conn = database_with_schema
+    with conn.cursor() as cur:
+        # Define a dummy user with a hashed password using the hash_password function.
+        user = {
+            "name": "user1",
+            "email": "user@email.com",
+            "password": hash_password("userpassword")
+        }
+        # Convert to tuple so values can be inserted into database
+        values_to_insert = (user["name"], user["email"], user["password"])
+        # Insert dummy user
+        cur.execute(
+            """
+            INSERT INTO users (name, email, password)
+            VALUES (%s, %s, %s)
+            RETURNING id;
+            """,
+            values_to_insert
+        )
+        # cur.fetchone() returns a tuple but we want just the id of the newly-created user
+        # (which is index [0]) so it can be deleted again in teardown
+        created_user_id = cur.fetchone()[0]
+        conn.commit()
+
+    yield created_user_id
+
+    # Teardown
+    with conn.cursor() as cur:
+        cur.execute("DELETE FROM users WHERE id = %s;", (created_user_id,))
