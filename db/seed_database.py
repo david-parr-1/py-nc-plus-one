@@ -3,6 +3,7 @@ from psycopg2 import sql
 from psycopg2.extras import execute_values
 from db.connection import get_db_connection
 from db.credentials import dbname, host, password
+from auth.auth import hash_password
 
 
 def drop_db_table(connection, table_name):
@@ -121,7 +122,8 @@ def insert_user_data(connection):
     the users table.
     """
     source_data = extract_json_data("db/data/users.json")
-    seed_rows = format_json_as_values(source_data)
+    hashed_passwords = [{**user, "password": hash_password(user["password"])} for user in source_data]
+    seed_rows = format_json_as_values(hashed_passwords)
     query = "INSERT INTO users (name, email, password) VALUES %s;"
     with connection.cursor() as curs:
         execute_values(curs, query, seed_rows)
@@ -164,7 +166,7 @@ def insert_rsvps_data(connection):
 
 
 def seed():
-    with get_db_connection(dbname=dbname, host=host, password=password) as conn:
+    with get_db_connection() as conn:
     
         # Dependendent tables (rsvps, events) need to be dropped first as they have foreign keys
         # from the users and venues tables.
