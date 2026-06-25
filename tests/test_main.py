@@ -8,8 +8,6 @@ from db.seed_database import drop_db_table
 from datetime import datetime, timezone
 
 
-
-
 @pytest.fixture(scope="session")
 def database_with_schema():
     with get_db_connection() as conn:
@@ -107,9 +105,33 @@ def add_test_data(database_with_schema):
 
         # Add dummy data to events
         events_to_insert = [
-                ('event1', 'event_description_1', datetime(2026, 6, 24, 9, 0, 0, tzinfo=timezone.utc), datetime(2026, 6, 24, 17, 0, 0, tzinfo=timezone.utc), 1, 1),
-                ('event2', 'event_description_2', datetime(2026, 6, 25, 9, 0, 0, tzinfo=timezone.utc), datetime(2026, 6, 25, 17, 0, 0, tzinfo=timezone.utc), 2, 2),
-                ('event3', 'event_description_3', datetime(2026, 6, 26, 9, 0, 0, tzinfo=timezone.utc), datetime(2026, 6, 26, 17, 0, 0, tzinfo=timezone.utc), 3, 3)
+                (
+                    'event1', 
+                    'event_description_1', 
+                    datetime(2026, 6, 24, 9, 0, 0, tzinfo=timezone.utc), 
+                    datetime(2026, 6, 24, 17, 0, 0, tzinfo=timezone.utc), 
+                    1, 
+                    1,
+                    datetime(2026, 6, 22, 9, 0, 0, tzinfo=timezone.utc), 
+                ),
+                (
+                    'event2', 
+                    'event_description_2', 
+                    datetime(2026, 6, 25, 9, 0, 0, tzinfo=timezone.utc), 
+                    datetime(2026, 6, 25, 17, 0, 0, tzinfo=timezone.utc), 
+                    2, 
+                    2,
+                    datetime(2026, 6, 22, 9, 0, 0, tzinfo=timezone.utc), 
+                ),
+                (
+                    'event3', 
+                    'event_description_3', 
+                    datetime(2026, 6, 26, 9, 0, 0, tzinfo=timezone.utc), 
+                    datetime(2026, 6, 26, 17, 0, 0, tzinfo=timezone.utc), 
+                    3, 
+                    3,
+                    datetime(2026, 6, 22, 9, 0, 0, tzinfo=timezone.utc), 
+                )
         ]
         events_query = """
             INSERT INTO events (
@@ -118,7 +140,8 @@ def add_test_data(database_with_schema):
                 starts_at, 
                 ends_at, 
                 organiser_id, 
-                venue_id
+                venue_id,
+                created_at
             ) 
             VALUES %s
             """
@@ -173,7 +196,7 @@ def test_get_api_events_returns_expected_number_of_rows(add_test_data):
 
 
 def test_get_api_events_returns_all_rows(add_test_data):
-    expected_result = [
+    expected_response = [
         {
             "id": 1,
             "title": "event1",
@@ -211,4 +234,50 @@ def test_get_api_events_returns_all_rows(add_test_data):
         }
         cleaned_events.append(cleaned_event)
     
-    assert cleaned_events == expected_result
+    assert cleaned_events == expected_response
+
+
+def test_get_api_event_returns_404_for_non_existent_id(add_test_data):
+    response = client.get("/api/events/9999")
+    assert response.status_code == 404
+    assert response.json()["detail"] == "Event not found"
+
+
+def test_get_api_event_returns_400_for_invalid_id(add_test_data):
+    response = client.get("/api/events/abc")
+    assert response.status_code == 400
+
+
+def test_get_api_event_returns_200_for_valid_id(add_test_data):
+    response = client.get("/api/events/1")
+    assert response.status_code == 200
+
+
+def test_get_api_event_returns_dict_with_event_key(add_test_data):
+    response = client.get("/api/events/1")
+    response_body = response.json()
+    assert type(response_body) == dict
+    assert response_body.get("event", None) != None
+
+
+def test_get_api_event_returns_correct_data_for_valid_id(add_test_data):
+    expected_response = {
+        "id": 1,
+        "title": "event1",
+        "description": "event_description_1",
+        "starts_at": datetime(2026, 6, 24, 9, 0, 0, tzinfo=timezone.utc),
+        "ends_at": datetime(2026, 6, 24, 17, 0, 0, tzinfo=timezone.utc),
+        "location": "venue1",
+        "address": "1, High Street, Somewhere",
+        "capacity": 500,
+        "created_at": datetime(2026, 6, 22, 9, 0, 0, tzinfo=timezone.utc)
+    }
+    response = client.get("/api/events/1")
+    response_body = response.json()["event"]
+    cleaned_response = {
+        **response_body,
+        "starts_at": datetime.fromisoformat(response_body["starts_at"].replace("Z", "+00:00")),
+        "ends_at": datetime.fromisoformat(response_body["ends_at"].replace("Z", "+00:00")),
+        "created_at": datetime.fromisoformat(response_body["created_at"].replace("Z", "+00:00"))
+    }
+    assert cleaned_response == expected_response
