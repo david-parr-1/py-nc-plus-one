@@ -128,7 +128,7 @@ def test_user_creation_fixture_inserts_dummy_user(user_with_hashed_password):
 
 
 def test_auth_login_returns_400_for_missing_password(user_with_hashed_password):
-    response = client.post("/api/auth/login", json={"email": "user1@email.com"})
+    response = client.post("/api/auth/login", json={"email": "user1@email.com "})
     assert response.status_code == 400
 
 
@@ -156,5 +156,4 @@ def test_auth_login_returns_401_for_incorrect_password(user_with_hashed_password
 
 def test_auth_login_returns_200_for_valid_credentials(user_with_hashed_password):
     response = client.post("/api/auth/login", json={"email": "user1@email.com", "password": "userpassword"})
-    print(response.json())
     assert response.status_code == 200
