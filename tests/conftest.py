@@ -163,12 +163,16 @@ def add_test_data(database_with_schema):
 
 @pytest.fixture(scope="function")
 def user_with_hashed_password(database_with_schema):
+    """
+    Creates a dummy user in the database with a hashed password that can be used for testing
+    auth functionality.
+    """
     conn = database_with_schema
     with conn.cursor() as cur:
         # Define a dummy user with a hashed password using the hash_password function.
         user = {
             "name": "user1",
-            "email": "user@email.com",
+            "email": "user1@email.com",
             "password": hash_password("userpassword")
         }
         # Convert to tuple so values can be inserted into database
@@ -191,4 +195,4 @@ def user_with_hashed_password(database_with_schema):
 
     # Teardown
     with conn.cursor() as cur:
-        cur.execute("DELETE FROM users WHERE id = %s;", (created_user_id,))
+        cur.execute("TRUNCATE TABLE users RESTART IDENTITY CASCADE;")
