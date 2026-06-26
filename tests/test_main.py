@@ -1,41 +1,36 @@
-from fastapi.testclient import TestClient
-from main import app
 from datetime import datetime, timezone
 
 
-client = TestClient(app)
-
-
-def test_app_handles_invalid_path():
+def test_app_handles_invalid_path(client):
     response = client.get(f"/invalid_path")
     assert response.status_code == 404
 
 
-def test_get_api_events_returns_status_200_when_successful():
+def test_get_api_events_returns_status_200_when_successful(client):
     response = client.get("/api/events")
     assert response.status_code == 200
 
 
-def test_get_api_events_returns_dict_with_events_key():
+def test_get_api_events_returns_dict_with_events_key(client):
     response = client.get("/api/events")
     response_body = response.json()
     assert type(response_body) == dict
     assert response_body.get("events", None) != None
 
 
-def test_get_api_events_key_contains_list_of_events():
+def test_get_api_events_key_contains_list_of_events(client):
     response = client.get("/api/events")
     response_body = response.json()
     assert type(response_body.get("events", None)) == list
 
 
-def test_get_api_events_returns_expected_number_of_rows(add_test_data):
+def test_get_api_events_returns_expected_number_of_rows(client, add_test_data):
     response = client.get("/api/events")
     response_body = response.json()
     assert len(response_body.get("events", None)) == 3
 
 
-def test_get_api_events_returns_all_rows(add_test_data):
+def test_get_api_events_returns_all_rows(client, add_test_data):
     expected_response = [
         {
             "id": 1,
@@ -77,30 +72,30 @@ def test_get_api_events_returns_all_rows(add_test_data):
     assert cleaned_events == expected_response
 
 
-def test_get_api_event_returns_404_for_non_existent_id(add_test_data):
+def test_get_api_event_returns_404_for_non_existent_id(client, add_test_data):
     response = client.get("/api/events/9999")
     assert response.status_code == 404
     assert response.json()["detail"] == "Event not found"
 
 
-def test_get_api_event_returns_400_for_invalid_id(add_test_data):
+def test_get_api_event_returns_400_for_invalid_id(client, add_test_data):
     response = client.get("/api/events/abc")
     assert response.status_code == 400
 
 
-def test_get_api_event_returns_200_for_valid_id(add_test_data):
+def test_get_api_event_returns_200_for_valid_id(client, add_test_data):
     response = client.get("/api/events/1")
     assert response.status_code == 200
 
 
-def test_get_api_event_returns_dict_with_event_key(add_test_data):
+def test_get_api_event_returns_dict_with_event_key(client, add_test_data):
     response = client.get("/api/events/1")
     response_body = response.json()
     assert type(response_body) == dict
     assert response_body.get("event", None) != None
 
 
-def test_get_api_event_returns_correct_data_for_valid_id(add_test_data):
+def test_get_api_event_returns_correct_data_for_valid_id(client, add_test_data):
     expected_response = {
         "id": 1,
         "title": "event1",
@@ -127,33 +122,33 @@ def test_user_creation_fixture_inserts_dummy_user(user_with_hashed_password):
     assert user_with_hashed_password == 1
 
 
-def test_auth_login_returns_400_for_missing_password(user_with_hashed_password):
+def test_auth_login_returns_400_for_missing_password(client, user_with_hashed_password):
     response = client.post("/api/auth/login", json={"email": "user1@email.com"})
     assert response.status_code == 400
 
 
-def test_auth_login_returns_400_for_missing_email(user_with_hashed_password):
+def test_auth_login_returns_400_for_missing_email(client, user_with_hashed_password):
     response = client.post("/api/auth/login", json={"password": "userpassword"})
     assert response.status_code == 400
 
 
-def test_auth_login_returns_400_for_both_fields_missing(user_with_hashed_password):
+def test_auth_login_returns_400_for_both_fields_missing(client, user_with_hashed_password):
     response = client.post("/api/auth/login", json={})
     assert response.status_code == 400
 
 
-def test_auth_login_returns_401_for_invalid_email(user_with_hashed_password):
+def test_auth_login_returns_401_for_invalid_email(client, user_with_hashed_password):
     response = client.post("/api/auth/login", json={"email": "user999@email.com", "password": "userpassword"})
     assert response.status_code == 401
     assert response.json()["detail"] == "Invalid email or password"
 
 
-def test_auth_login_returns_401_for_incorrect_password(user_with_hashed_password):
+def test_auth_login_returns_401_for_incorrect_password(client, user_with_hashed_password):
     response = client.post("/api/auth/login", json={"email": "user1@email.com", "password": "incorrectpassword"})
     assert response.status_code == 401
     assert response.json()["detail"] == "Invalid email or password"
 
 
-def test_auth_login_returns_200_for_valid_credentials(user_with_hashed_password):
+def test_auth_login_returns_200_for_valid_credentials(client, user_with_hashed_password):
     response = client.post("/api/auth/login", json={"email": "user1@email.com", "password": "userpassword"})
     assert response.status_code == 200

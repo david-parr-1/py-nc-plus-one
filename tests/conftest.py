@@ -4,6 +4,8 @@ from psycopg2 import sql
 from psycopg2.extras import execute_values
 from datetime import datetime, timezone
 from auth.auth import hash_password
+from fastapi.testclient import TestClient
+from main import app
 
 
 @pytest.fixture(scope="session")
@@ -196,3 +198,10 @@ def user_with_hashed_password(database_with_schema):
     # Teardown
     with conn.cursor() as cur:
         cur.execute("TRUNCATE TABLE users RESTART IDENTITY CASCADE;")
+
+
+@pytest.fixture(scope="module")
+def client():
+    with TestClient(app) as c:
+        yield c
+        
