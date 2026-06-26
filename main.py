@@ -1,10 +1,17 @@
 from fastapi import FastAPI, HTTPException, Request, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
+from pydantic import BaseModel
 from db.connection import get_db_connection
+from auth.auth import verify_password, create_access_token
 
 
 app = FastAPI()
+
+
+class CredentialsRequest(BaseModel):
+    email: str
+    password: str
 
 
 @app.exception_handler(RequestValidationError)
@@ -78,3 +85,25 @@ def get_event(event_id: int):
         }
         return {"event": event_data}
     
+
+@app.post("/api/auth/login")
+def login_user(payload: CredentialsRequest):
+    with get_db_connection() as conn:
+        # Retrieve the user's hashed password from the users table to enable password
+        # verification
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT email, password, id FROM users WHERE email = %s;
+                """,
+                (payload.email,)
+            )
+            user = cur.fetchone()
+            # Return the same response whether the supplied email address is not in
+            # the users table or where the email address is in the users table but
+            # the passwords do not match
+            if user is None or not verify_password(payload.password, user[1]):
+                raise HTTPException(status_code=401, detail="Invalid email or password")
+            
+            token = create_access_token(user[2])
+            return {"token": token}

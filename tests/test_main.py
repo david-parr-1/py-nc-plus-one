@@ -121,3 +121,40 @@ def test_get_api_event_returns_correct_data_for_valid_id(add_test_data):
         "created_at": datetime.fromisoformat(response_body["created_at"].replace("Z", "+00:00"))
     }
     assert cleaned_response == expected_response
+
+
+def test_user_creation_fixture_inserts_dummy_user(user_with_hashed_password):
+    assert user_with_hashed_password == 1
+
+
+def test_auth_login_returns_400_for_missing_password(user_with_hashed_password):
+    response = client.post("/api/auth/login", json={"email": "user1@email.com"})
+    assert response.status_code == 400
+
+
+def test_auth_login_returns_400_for_missing_email(user_with_hashed_password):
+    response = client.post("/api/auth/login", json={"password": "userpassword"})
+    assert response.status_code == 400
+
+
+def test_auth_login_returns_400_for_both_fields_missing(user_with_hashed_password):
+    response = client.post("/api/auth/login", json={})
+    assert response.status_code == 400
+
+
+def test_auth_login_returns_401_for_invalid_email(user_with_hashed_password):
+    response = client.post("/api/auth/login", json={"email": "user999@email.com", "password": "userpassword"})
+    assert response.status_code == 401
+    assert response.json()["detail"] == "Invalid email or password"
+
+
+def test_auth_login_returns_401_for_incorrect_password(user_with_hashed_password):
+    response = client.post("/api/auth/login", json={"email": "user1@email.com", "password": "incorrectpassword"})
+    assert response.status_code == 401
+    assert response.json()["detail"] == "Invalid email or password"
+
+
+def test_auth_login_returns_200_for_valid_credentials(user_with_hashed_password):
+    response = client.post("/api/auth/login", json={"email": "user1@email.com", "password": "userpassword"})
+    print(response.json())
+    assert response.status_code == 200
