@@ -6,19 +6,19 @@ def test_app_handles_invalid_path(client):
     assert response.status_code == 404
 
 
-def test_get_api_events_returns_status_200_when_successful(client):
+def test_get_api_events_returns_status_200_when_successful(client, add_test_data):
     response = client.get("/api/events")
     assert response.status_code == 200
 
 
-def test_get_api_events_returns_dict_with_events_key(client):
+def test_get_api_events_returns_dict_with_events_key(client, add_test_data):
     response = client.get("/api/events")
     response_body = response.json()
     assert type(response_body) == dict
     assert response_body.get("events", None) != None
 
 
-def test_get_api_events_key_contains_list_of_events(client):
+def test_get_api_events_key_contains_list_of_events(client, add_test_data):
     response = client.get("/api/events")
     response_body = response.json()
     assert type(response_body.get("events", None)) == list

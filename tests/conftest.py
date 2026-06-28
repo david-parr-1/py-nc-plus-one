@@ -1,77 +1,103 @@
 import pytest
+import psycopg2
+import os
+from dotenv import load_dotenv
 from db.connection import get_db_connection
 from psycopg2 import sql
 from psycopg2.extras import execute_values
+from psycopg2.extensions import connection
 from datetime import datetime, timezone
 from auth.auth import hash_password
+from fastapi import Depends
 from fastapi.testclient import TestClient
 from main import app
+from typing import Generator
 
 
-@pytest.fixture(scope="session")
-def database_with_schema():
-    with get_db_connection() as conn:
-        with conn.cursor() as cur:
-            # Drop tables if they exist
-            cur.execute("DROP TABLE IF EXISTS rsvps CASCADE;")
-            cur.execute("DROP TABLE IF EXISTS events CASCADE;")
-            cur.execute("DROP TABLE IF EXISTS users CASCADE;")
-            cur.execute("DROP TABLE IF EXISTS venues CASCADE;")
+load_dotenv()
 
-            # Create users table
-            cur.execute(
-                """
-                CREATE TABLE users (
-                    id SERIAL PRIMARY KEY,
-                    email VARCHAR(255) UNIQUE NOT NULL,
-                    password VARCHAR(255) NOT NULL,
-                    name VARCHAR(255) NOT NULL,
-                    created_at TIMESTAMPTZ DEFAULT NOW()
-                );
-                """
-            )
-            # Create venues table
-            cur.execute(
-                """
-                CREATE TABLE venues (
-                    id SERIAL PRIMARY KEY,
-                    name VARCHAR(255) NOT NULL,
-                    address TEXT,
-                    capacity INT
-                );
-                """
-            )
 
-            # Creates events table
-            cur.execute(
-                """
-                CREATE TABLE events (
-                    id SERIAL PRIMARY KEY,
-                    title VARCHAR(255) NOT NULL,
-                    description VARCHAR(255),
-                    starts_at TIMESTAMPTZ NOT NULL,
-                    ends_at TIMESTAMPTZ NOT NULL,
-                    organiser_id INT NOT NULL REFERENCES users(id),
-                    venue_id INT NOT NULL REFERENCES venues(id),
-                    created_at TIMESTAMPTZ DEFAULT NOW()
-                );
-                """
-            )
+@pytest.fixture(scope="module")
+def shared_connection():
+    """
+    Creates a connection to the test database that can be shared across the execution of the test 
+    suite.
+    """
+    db_config = {
+        "dbname": "nc_plus_one_test",
+        "host": os.getenv("HOST"),
+        "password": os.getenv("PASSWORD")
+    }
+    conn = psycopg2.connect(**db_config)
+    conn.autocommit = False
+    yield conn
+    conn.close()
 
-            # Create rsvps table
-            cur.execute(
-                """
-                CREATE TABLE rsvps (
-                    id SERIAL PRIMARY KEY,
-                    attendee_id INTEGER REFERENCES users(id),
-                    event_id INTEGER REFERENCES events(id),
-                    created_at TIMESTAMPTZ DEFAULT NOW()
-                );
-                """
-            )
-            conn.commit()
 
-        yield conn
+@pytest.fixture(scope="module", autouse=True)
+def database_with_schema(shared_connection):
+    conn = shared_connection
+    with conn.cursor() as cur:
+        # Drop tables if they exist
+        cur.execute("DROP TABLE IF EXISTS rsvps CASCADE;")
+        cur.execute("DROP TABLE IF EXISTS events CASCADE;")
+        cur.execute("DROP TABLE IF EXISTS users CASCADE;")
+        cur.execute("DROP TABLE IF EXISTS venues CASCADE;")
+
+        # Create users table
+        cur.execute(
+            """
+            CREATE TABLE users (
+                id SERIAL PRIMARY KEY,
+                email VARCHAR(255) UNIQUE NOT NULL,
+                password VARCHAR(255) NOT NULL,
+                name VARCHAR(255) NOT NULL,
+                created_at TIMESTAMPTZ DEFAULT NOW()
+            );
+            """
+        )
+        # Create venues table
+        cur.execute(
+            """
+            CREATE TABLE venues (
+                id SERIAL PRIMARY KEY,
+                name VARCHAR(255) NOT NULL,
+                address TEXT,
+                capacity INT
+            );
+            """
+        )
+
+        # Creates events table
+        cur.execute(
+            """
+            CREATE TABLE events (
+                id SERIAL PRIMARY KEY,
+                title VARCHAR(255) NOT NULL,
+                description VARCHAR(255),
+                starts_at TIMESTAMPTZ NOT NULL,
+                ends_at TIMESTAMPTZ NOT NULL,
+                organiser_id INT NOT NULL REFERENCES users(id),
+                venue_id INT NOT NULL REFERENCES venues(id),
+                created_at TIMESTAMPTZ DEFAULT NOW()
+            );
+            """
+        )
+
+        # Create rsvps table
+        cur.execute(
+            """
+            CREATE TABLE rsvps (
+                id SERIAL PRIMARY KEY,
+                attendee_id INTEGER REFERENCES users(id),
+                event_id INTEGER REFERENCES events(id),
+                created_at TIMESTAMPTZ DEFAULT NOW()
+            );
+            """
+        )
+        conn.commit()
+
+    yield conn
 
     # Teardown
     with conn.cursor() as cur:
@@ -79,6 +105,7 @@ def database_with_schema():
         cur.execute("DROP TABLE IF EXISTS events CASCADE;")
         cur.execute("DROP TABLE IF EXISTS users CASCADE;")
         cur.execute("DROP TABLE IF EXISTS venues CASCADE;")
+    conn.commit()
 
 
 @pytest.fixture(scope="function")
@@ -161,6 +188,34 @@ def add_test_data(database_with_schema):
             # to reset their id serialisation to 1.
             query = sql.SQL("TRUNCATE TABLE {} RESTART IDENTITY CASCADE;").format(sql.Identifier(table))
             cur.execute(query)
+    conn.commit()
+
+
+@pytest.fixture()
+def client(shared_connection):
+    """
+    Creates a FastAPI TestClient but overrides the database connection dependencies so that the
+    main app uses the same connection as the test suite, thus enabling rollback of any database
+    transactions that are executed during the test suite.
+    """
+    shared_connection.rollback()
+    
+    def _override_get_db():
+        try:
+            yield shared_connection
+        finally:
+            pass
+
+    app.dependency_overrides[get_db_connection] = _override_get_db
+
+    with TestClient(app) as c:
+        yield c
+
+    shared_connection.rollback()
+
+    app.dependency_overrides.clear()
+
+      
 
 
 @pytest.fixture(scope="function")
@@ -198,10 +253,4 @@ def user_with_hashed_password(database_with_schema):
     # Teardown
     with conn.cursor() as cur:
         cur.execute("TRUNCATE TABLE users RESTART IDENTITY CASCADE;")
-
-
-@pytest.fixture(scope="module")
-def client():
-    with TestClient(app) as c:
-        yield c
-        
+    conn.commit()
