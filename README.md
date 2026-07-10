@@ -54,7 +54,7 @@ terraform {
     }
   }
   backend "s3" {
-    bucket = "dp-tf-deploy"
+    bucket = "<INSERT YOUR BUCKET NAME HERE>"
     key    = "nc-plus-one/terraform.tfstate"
     region = "eu-west-2"
   }
