@@ -42,17 +42,22 @@ In order for Terraform to be able to store its state remotely rather than locall
 
 ```hcl
 terraform {
-    required_providers {
-        aws = {
-            source = "hashicorp/aws"
-            version = "~> 6.0"
-        }
+  required_providers {
+    aws = {
+      source  = "hashicorp/aws"
+      version = "~> 6.0"
     }
-    backend "s3" {
-        bucket = "<INSERT YOUR BUCKET NAME HERE>"
-        key = "nc-plus-one/terraform.tfstate"
-        region = "eu-west-2"
+
+    http = {
+      source  = "hashicorp/http"
+      version = "~> 3.6"
     }
+  }
+  backend "s3" {
+    bucket = "dp-tf-deploy"
+    key    = "nc-plus-one/terraform.tfstate"
+    region = "eu-west-2"
+  }
 }
 ```
 
@@ -67,3 +72,7 @@ If the `terraform init` command executes successfully, execute the `terraform pl
 ### Terraform Apply
 
 If no problems are identified after executing the `terraform plan` command then the Terraform configuration can be applied using `terraform apply`.
+
+#### Note on EC2 Configuration
+
+The Terraform configuration utilises the free-tier-eligible "t2.micro" EC2 instance type and the most recent AMI for Ubuntu Server 24.04 LTS (Noble Numbat), specifically configured as an AMD64 (64-bit) architecture.
