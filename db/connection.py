@@ -9,8 +9,10 @@ load_dotenv()
 
 
 DB_NAME = os.getenv("DB_NAME")
-HOST = os.getenv("HOST")
-PASSWORD = os.getenv("PASSWORD")
+DB_HOST = os.getenv("DB_HOST")
+DB_PORT = os.getenv("DB_PORT")
+DB_USERNAME = os.getenv("DB_USERNAME")
+DB_PASSWORD = os.getenv("DB_PASSWORD")
 
 
 def get_db_connection() -> Generator[psycopg2.extensions.connection]:
@@ -20,8 +22,16 @@ def get_db_connection() -> Generator[psycopg2.extensions.connection]:
     """
     
     try:
-        conn = psycopg2.connect(dbname=DB_NAME, host=HOST, password=PASSWORD)
+        conn = psycopg2.connect(
+            dbname=DB_NAME, 
+            host=DB_HOST, 
+            port=DB_PORT, 
+            user=DB_USERNAME, 
+            password=DB_PASSWORD
+        )
+
         yield conn
+
     finally:
         if conn:
             conn.close()

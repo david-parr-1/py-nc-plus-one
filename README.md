@@ -1,4 +1,4 @@
-# Portfolio Project = nc-plus-one-seeding
+# Portfolio Project: nc-plus-one-seeding
 
 This is the README file for the portfolio project
 
@@ -22,7 +22,9 @@ An `.env` file will require creation to allow secure management of credentials w
 The format should be:
 
 ```none
-DB_NAME=your_db_name
-HOST=your_host
-PASSWORD=your_password
+DB_NAME=<your_db_name>
+DB_USERNAME=<your_db_username>
+DB_PASSWORD=<your_password>
+DB_HOST=<your_host>
+DB_PORT=<your_port>
 ```
