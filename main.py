@@ -24,6 +24,11 @@ def handle_request_validation_error(request: Request, exc: RequestValidationErro
     return JSONResponse(status_code=status.HTTP_400_BAD_REQUEST, content={"error": exc.errors()})
 
 
+@app.get("/api/healthcheck")
+def healthcheck():
+    return {"detail": {"Healthcheck": "Running"}}
+
+
 @app.get("/api/events")
 def get_events(conn: psycopg2.extensions.connection = Depends(get_db_connection)):
     with conn.cursor() as cur:

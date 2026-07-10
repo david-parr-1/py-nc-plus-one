@@ -152,3 +152,14 @@ def test_auth_login_returns_401_for_incorrect_password(client, user_with_hashed_
 def test_auth_login_returns_200_for_valid_credentials(client, user_with_hashed_password):
     response = client.post("/api/auth/login", json={"email": "user1@email.com", "password": "userpassword"})
     assert response.status_code == 200
+
+
+def test_healthcheck_returns_status_code_200(client):
+    response = client.get("/api/healthcheck")
+    assert response.status_code == 200
+
+
+def test_healthcheck_returns_correct_response(client):
+    expected_response = {"Healthcheck": "Running"}
+    response = client.get("/api/healthcheck")
+    assert response.json()["detail"] == expected_response
