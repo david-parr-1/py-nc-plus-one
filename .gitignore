@@ -8,3 +8,7 @@ portfolio_nc_plus_one.md
 .env
 Portfolio - nc-plus-one - Deployment.md
 .tasks/*
+**/.terraform.lock.hcl
+**/.terraform/*
+*.tfstate
+*.tfstate.*
