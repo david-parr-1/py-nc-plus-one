@@ -15,7 +15,7 @@ DB_USERNAME = os.getenv("DB_USERNAME")
 DB_PASSWORD = os.getenv("DB_PASSWORD")
 
 
-def get_db_connection() -> Generator[psycopg2.extensions.connection]:
+def get_db_connection() -> Generator[psycopg2.extensions.connection, None, None]:
     """
     Establishes a connection to a database using credentials provided as arguments. The connection
     is yielded for use elsewhere.
