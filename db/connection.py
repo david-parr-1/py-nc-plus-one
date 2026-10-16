@@ -35,3 +35,12 @@ def get_db_connection() -> Generator[psycopg2.extensions.connection, None, None]
     finally:
         if conn:
             conn.close()
+
+def create_db_connection() -> connection:
+    return psycopg2.connect(
+        dbname=DB_NAME, 
+        host=DB_HOST, 
+        port=DB_PORT, 
+        user=DB_USERNAME, 
+        password=DB_PASSWORD
+    )

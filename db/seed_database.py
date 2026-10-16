@@ -1,8 +1,8 @@
 import json
 from psycopg2 import sql
 from psycopg2.extras import execute_values
-from db.connection import get_db_connection
-from db.credentials import dbname, host, password
+from psycopg2.extensions import connection
+from db.connection import create_db_connection
 from auth.auth import hash_password
 
 
@@ -165,13 +165,12 @@ def insert_rsvps_data(connection):
         execute_values(curs, query, seed_rows)
 
 
-def seed():
-    with get_db_connection() as conn:
+def seed(conn: connection) -> None:
+    # Dependendent tables (rsvps, events) need to be dropped first as they have foreign keys
+    # from the users and venues tables.
+    db_tables = ["rsvps", "events", "users", "venues"]
     
-        # Dependendent tables (rsvps, events) need to be dropped first as they have foreign keys
-        # from the users and venues tables.
-        db_tables = ["rsvps", "events", "users", "venues"]
-        
+    try:
         # Drop users and venues tables if they already exists
         for table in db_tables:
             drop_db_table(conn, table)
@@ -188,5 +187,13 @@ def seed():
         insert_events_data(conn)
         insert_rsvps_data(conn)
 
+        conn.commit()
+
+    except Exception as e:
+        print(str(e))
+        conn.rollback()
+
+
 if __name__ == "__main__":
-    seed()
+    with create_db_connection() as conn:
+        seed(conn)

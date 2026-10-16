@@ -23,12 +23,21 @@ def shared_connection():
     Creates a connection to the test database that can be shared across the execution of the test 
     suite.
     """
-    db_config = {
-        "dbname": "nc_plus_one_test",
-        "host": os.getenv("HOST"),
-        "password": os.getenv("PASSWORD")
-    }
-    conn = psycopg2.connect(**db_config)
+    # db_config = {
+    #     "dbname": os.getenv("DB_NAME"),
+    #     "host": os.getenv("DB_HOST"),
+    #     "password": os.getenv("DB_PASSWORD"),
+    #     "port": os.getenv("DB_PORT"),
+    #     "user": os.getenv("DB_USER")
+    # }
+    pytest.skip("Database unavailable")
+    conn = psycopg2.connect(
+        dbname=os.getenv("DB_NAME"),
+        host=os.getenv("DB_HOST"),
+        password=os.getenv("DB_PASSWORD"),
+        port=os.getenv("DB_PORT"),
+        user=os.getenv("DB_USER")
+    )
     conn.autocommit = False
     yield conn
     conn.close()
