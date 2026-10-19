@@ -11,41 +11,40 @@ from auth.auth import hash_password
 from fastapi import Depends
 from fastapi.testclient import TestClient
 from main import app
-from typing import Generator
-
+from testcontainers.community.postgres import PostgresContainer
 
 load_dotenv()
 
 
-@pytest.fixture(scope="module")
-def shared_connection():
+@pytest.fixture(scope="session")
+def postgres_container():
     """
-    Creates a connection to the test database that can be shared across the execution of the test 
-    suite.
+    Spins up an ephemeral Postgres container for the duration of the test session.
     """
-    # db_config = {
-    #     "dbname": os.getenv("DB_NAME"),
-    #     "host": os.getenv("DB_HOST"),
-    #     "password": os.getenv("DB_PASSWORD"),
-    #     "port": os.getenv("DB_PORT"),
-    #     "user": os.getenv("DB_USER")
-    # }
-    pytest.skip("Database unavailable")
+    with PostgresContainer(image="postgres:16-alpine") as postgres:
+        yield postgres
+
+
+@pytest.fixture(scope="session")
+def postgres_connection(postgres_container):
     conn = psycopg2.connect(
-        dbname=os.getenv("DB_NAME"),
-        host=os.getenv("DB_HOST"),
-        password=os.getenv("DB_PASSWORD"),
-        port=os.getenv("DB_PORT"),
-        user=os.getenv("DB_USER")
+        host=postgres_container.get_container_host_ip(),
+        port=postgres_container.get_exposed_port(5432),
+        user=postgres_container.username,
+        password=postgres_container.password,
+        dbname=postgres_container.dbname
     )
     conn.autocommit = False
+    
     yield conn
-    conn.close()
+
+    if conn:
+        conn.close()
 
 
 @pytest.fixture(scope="module", autouse=True)
-def database_with_schema(shared_connection):
-    conn = shared_connection
+def create_db_schema(postgres_connection):
+    conn = postgres_connection
     with conn.cursor() as cur:
         # Drop tables if they exist
         cur.execute("DROP TABLE IF EXISTS rsvps CASCADE;")
@@ -117,9 +116,56 @@ def database_with_schema(shared_connection):
     conn.commit()
 
 
-@pytest.fixture(scope="function")
-def add_test_data(database_with_schema):
-    conn = database_with_schema
+@pytest.fixture(scope="session")
+def mock_events():
+    return [
+        {
+            "title": "event1",
+            "description": "event_description_1",
+            "starts_at": datetime(2026, 1, 1, 9, 0, 0, tzinfo=timezone.utc)
+            .isoformat(),
+            "ends_at": datetime(2026, 1, 1, 17, 0, 0, tzinfo=timezone.utc)
+            .isoformat(),
+            "organiser_id": 1,
+            "venue_id": 1,
+            "created_at": datetime(2025, 12, 31, 12, 0, 0, tzinfo=timezone.utc)
+            .isoformat()
+        },
+        {
+            "title": "event2",
+            "description": "event_description_2",
+            "starts_at": datetime(2026, 1, 2, 9, 0, 0, tzinfo=timezone.utc)
+            .isoformat(),
+            "ends_at": datetime(2026, 1, 2, 17, 0, 0, tzinfo=timezone.utc)
+            .isoformat(),
+            "organiser_id": 2,
+            "venue_id": 2,
+            "created_at": datetime(2025, 12, 31, 12, 0, 0, tzinfo=timezone.utc)
+            .isoformat()
+        },
+        {
+            "title": "event3",
+            "description": "event_description_3",
+            "starts_at": datetime(2026, 1, 3, 9, 0, 0, tzinfo=timezone.utc)
+            .isoformat(),
+            "ends_at": datetime(2026, 1, 3, 17, 0, 0, tzinfo=timezone.utc)
+            .isoformat(),
+            "organiser_id": 3,
+            "venue_id": 3,
+            "created_at": datetime(2025, 12, 31, 12, 0, 0, tzinfo=timezone.utc)
+            .isoformat()
+        }
+    ]
+
+
+@pytest.fixture(scope="module")
+def mock_event_tuples(mock_events):
+    return [tuple(value for value in event.values()) for event in mock_events]
+
+
+@pytest.fixture(scope="module")
+def add_test_data(create_db_schema, mock_event_tuples):
+    conn = create_db_schema
     with conn.cursor() as cur:
         # Add dummy data to users
         users_to_insert = [
@@ -140,35 +186,7 @@ def add_test_data(database_with_schema):
         execute_values(cur, venue_query, venues_to_insert)
 
         # Add dummy data to events
-        events_to_insert = [
-                (
-                    'event1', 
-                    'event_description_1', 
-                    datetime(2026, 6, 24, 9, 0, 0, tzinfo=timezone.utc), 
-                    datetime(2026, 6, 24, 17, 0, 0, tzinfo=timezone.utc), 
-                    1, 
-                    1,
-                    datetime(2026, 6, 22, 9, 0, 0, tzinfo=timezone.utc), 
-                ),
-                (
-                    'event2', 
-                    'event_description_2', 
-                    datetime(2026, 6, 25, 9, 0, 0, tzinfo=timezone.utc), 
-                    datetime(2026, 6, 25, 17, 0, 0, tzinfo=timezone.utc), 
-                    2, 
-                    2,
-                    datetime(2026, 6, 22, 9, 0, 0, tzinfo=timezone.utc), 
-                ),
-                (
-                    'event3', 
-                    'event_description_3', 
-                    datetime(2026, 6, 26, 9, 0, 0, tzinfo=timezone.utc), 
-                    datetime(2026, 6, 26, 17, 0, 0, tzinfo=timezone.utc), 
-                    3, 
-                    3,
-                    datetime(2026, 6, 22, 9, 0, 0, tzinfo=timezone.utc), 
-                )
-        ]
+        events_to_insert = mock_event_tuples
         events_query = """
             INSERT INTO events (
                 title, 
@@ -184,34 +202,21 @@ def add_test_data(database_with_schema):
         execute_values(cur, events_query, events_to_insert)
     conn.commit()
 
-    yield
-
-    # Teardown
-    db_tables = ["rsvps", "events", "users", "venues"]
-
-    with conn.cursor() as cur:
-        # Delete all data inserted into tables
-        for table in db_tables:
-            # TRUNCATE TABLE is used to quickly delete any dummy rows that have been added to
-            # the test database's tables. The "RESTART IDENTITY" parameter causes the tables
-            # to reset their id serialisation to 1.
-            query = sql.SQL("TRUNCATE TABLE {} RESTART IDENTITY CASCADE;").format(sql.Identifier(table))
-            cur.execute(query)
-    conn.commit()
+    yield conn
 
 
-@pytest.fixture()
-def client(shared_connection):
+@pytest.fixture(scope="module")
+def client(add_test_data):
     """
     Creates a FastAPI TestClient but overrides the database connection dependencies so that the
     main app uses the same connection as the test suite, thus enabling rollback of any database
     transactions that are executed during the test suite.
     """
-    shared_connection.rollback()
+    add_test_data.rollback()
     
     def _override_get_db():
         try:
-            yield shared_connection
+            yield add_test_data
         finally:
             pass
 
@@ -220,26 +225,24 @@ def client(shared_connection):
     with TestClient(app) as c:
         yield c
 
-    shared_connection.rollback()
+    add_test_data.rollback()
 
     app.dependency_overrides.clear()
 
-      
 
-
-@pytest.fixture(scope="function")
-def user_with_hashed_password(database_with_schema):
+@pytest.fixture(scope="module")
+def user_with_hashed_password(add_test_data):
     """
     Creates a dummy user in the database with a hashed password that can be used for testing
     auth functionality.
     """
-    conn = database_with_schema
+    conn = add_test_data
     with conn.cursor() as cur:
         # Define a dummy user with a hashed password using the hash_password function.
         user = {
-            "name": "user1",
-            "email": "user1@email.com",
-            "password": hash_password("userpassword")
+            "name": "dummy user",
+            "email": "dummy_user@email.com",
+            "password": hash_password("dummypassword")
         }
         # Convert to tuple so values can be inserted into database
         values_to_insert = (user["name"], user["email"], user["password"])

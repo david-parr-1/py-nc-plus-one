@@ -1,3 +1,4 @@
+import pytest
 from datetime import datetime, timezone
 
 
@@ -30,46 +31,41 @@ def test_get_api_events_returns_expected_number_of_rows(client, add_test_data):
     assert len(response_body.get("events", None)) == 3
 
 
-def test_get_api_events_returns_all_rows(client, add_test_data):
-    expected_response = [
+def test_get_api_events_returns_all_rows(client, mock_events, add_test_data):
+    expected_payload = [
         {
             "id": 1,
             "title": "event1",
-            "starts_at": datetime(2026, 6, 24, 9, 0, 0, tzinfo=timezone.utc),
-            "ends_at": datetime(2026, 6, 24, 17, 0, 0, tzinfo=timezone.utc),
+            "starts_at": datetime(2026, 1, 1, 9, 0, 0, tzinfo=timezone.utc)
+            .isoformat(),
+            "ends_at": datetime(2026, 1, 1, 17, 0, 0, tzinfo=timezone.utc)
+            .isoformat(),
             "location": "venue1"
         },
         {
             "id": 2,
             "title": "event2",
-            "starts_at": datetime(2026, 6, 25, 9, 0, 0, tzinfo=timezone.utc),
-            "ends_at": datetime(2026, 6, 25, 17, 0, 0, tzinfo=timezone.utc),
+            "starts_at": datetime(2026, 1, 2, 9, 0, 0, tzinfo=timezone.utc)
+            .isoformat(),
+            "ends_at": datetime(2026, 1, 2, 17, 0, 0, tzinfo=timezone.utc)
+            .isoformat(),
             "location": "venue2"
         },
         {
             "id": 3,
             "title": "event3",
-            "starts_at": datetime(2026, 6, 26, 9, 0, 0, tzinfo=timezone.utc),
-            "ends_at": datetime(2026, 6, 26, 17, 0, 0, tzinfo=timezone.utc),
+            "starts_at": datetime(2026, 1, 3, 9, 0, 0, tzinfo=timezone.utc)
+            .isoformat(),
+            "ends_at": datetime(2026, 1, 3, 17, 0, 0, tzinfo=timezone.utc)
+            .isoformat(),
             "location": "venue3"
         }
     ]
 
     response = client.get("/api/events")
-    # The API response returns the date fields in ISO8601 format string so these need to be 
-    # converted back to Python-native datetime format to enable proper assertion against the
-    # expected values. 
-    responses = response.json()["events"]
-    cleaned_events = []
-    for record in responses:
-        cleaned_event = {
-            **record,
-            "starts_at": datetime.fromisoformat(record["starts_at"].replace("Z", "+00:00")),
-            "ends_at": datetime.fromisoformat(record["ends_at"].replace("Z", "+00:00")),
-        }
-        cleaned_events.append(cleaned_event)
-    
-    assert cleaned_events == expected_response
+    response_payload = response.json()["events"]
+
+    assert response_payload == expected_payload
 
 
 def test_get_api_event_returns_404_for_non_existent_id(client, add_test_data):
@@ -96,39 +92,33 @@ def test_get_api_event_returns_dict_with_event_key(client, add_test_data):
 
 
 def test_get_api_event_returns_correct_data_for_valid_id(client, add_test_data):
-    expected_response = {
+    expected_payload = {
         "id": 1,
         "title": "event1",
         "description": "event_description_1",
-        "starts_at": datetime(2026, 6, 24, 9, 0, 0, tzinfo=timezone.utc),
-        "ends_at": datetime(2026, 6, 24, 17, 0, 0, tzinfo=timezone.utc),
+        "starts_at": datetime(2026, 1, 1, 9, 0, 0, tzinfo=timezone.utc)
+        .isoformat(),
+        "ends_at": datetime(2026, 1, 1, 17, 0, 0, tzinfo=timezone.utc)
+        .isoformat(),
         "location": "venue1",
         "address": "1, High Street, Somewhere",
         "capacity": 500,
-        "created_at": datetime(2026, 6, 22, 9, 0, 0, tzinfo=timezone.utc)
+        "created_at": datetime(2025, 12, 31, 12, 0, 0, tzinfo=timezone.utc)
+        .isoformat()
     }
     response = client.get("/api/events/1")
-    response_body = response.json()["event"]
-    cleaned_response = {
-        **response_body,
-        "starts_at": datetime.fromisoformat(response_body["starts_at"].replace("Z", "+00:00")),
-        "ends_at": datetime.fromisoformat(response_body["ends_at"].replace("Z", "+00:00")),
-        "created_at": datetime.fromisoformat(response_body["created_at"].replace("Z", "+00:00"))
-    }
-    assert cleaned_response == expected_response
+    response_payload = response.json()["event"]
 
-
-def test_user_creation_fixture_inserts_dummy_user(user_with_hashed_password):
-    assert user_with_hashed_password == 1
+    assert response_payload == expected_payload
 
 
 def test_auth_login_returns_400_for_missing_password(client, user_with_hashed_password):
-    response = client.post("/api/auth/login", json={"email": "user1@email.com"})
+    response = client.post("/api/auth/login", json={"email": "dummy_user@email.com"})
     assert response.status_code == 400
 
 
 def test_auth_login_returns_400_for_missing_email(client, user_with_hashed_password):
-    response = client.post("/api/auth/login", json={"password": "userpassword"})
+    response = client.post("/api/auth/login", json={"password": "dummypassword"})
     assert response.status_code == 400
 
 
@@ -138,19 +128,19 @@ def test_auth_login_returns_400_for_both_fields_missing(client, user_with_hashed
 
 
 def test_auth_login_returns_401_for_invalid_email(client, user_with_hashed_password):
-    response = client.post("/api/auth/login", json={"email": "user999@email.com", "password": "userpassword"})
+    response = client.post("/api/auth/login", json={"email": "user999@email.com", "password": "dummypassword"})
     assert response.status_code == 401
     assert response.json()["detail"] == "Invalid email or password"
 
 
 def test_auth_login_returns_401_for_incorrect_password(client, user_with_hashed_password):
-    response = client.post("/api/auth/login", json={"email": "user1@email.com", "password": "incorrectpassword"})
+    response = client.post("/api/auth/login", json={"email": "dummy_user@email.com", "password": "incorrectpassword"})
     assert response.status_code == 401
     assert response.json()["detail"] == "Invalid email or password"
 
 
 def test_auth_login_returns_200_for_valid_credentials(client, user_with_hashed_password):
-    response = client.post("/api/auth/login", json={"email": "user1@email.com", "password": "userpassword"})
+    response = client.post("/api/auth/login", json={"email": "dummy_user@email.com", "password": "dummypassword"})
     assert response.status_code == 200
 
 
