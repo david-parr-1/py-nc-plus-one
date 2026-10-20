@@ -1,17 +1,15 @@
-import pytest
+from datetime import UTC, datetime
+
 import psycopg2
-import os
+import pytest
 from dotenv import load_dotenv
-from db.connection import get_db_connection
-from psycopg2 import sql
-from psycopg2.extras import execute_values
-from psycopg2.extensions import connection
-from datetime import datetime, timezone
-from auth.auth import hash_password
-from fastapi import Depends
 from fastapi.testclient import TestClient
-from main import app
+from psycopg2.extras import execute_values
 from testcontainers.community.postgres import PostgresContainer
+
+from auth.auth import hash_password
+from db.connection import get_db_connection
+from main import app
 
 load_dotenv()
 
@@ -32,10 +30,10 @@ def postgres_connection(postgres_container):
         port=postgres_container.get_exposed_port(5432),
         user=postgres_container.username,
         password=postgres_container.password,
-        dbname=postgres_container.dbname
+        dbname=postgres_container.dbname,
     )
     conn.autocommit = False
-    
+
     yield conn
 
     if conn:
@@ -122,39 +120,30 @@ def mock_events():
         {
             "title": "event1",
             "description": "event_description_1",
-            "starts_at": datetime(2026, 1, 1, 9, 0, 0, tzinfo=timezone.utc)
-            .isoformat(),
-            "ends_at": datetime(2026, 1, 1, 17, 0, 0, tzinfo=timezone.utc)
-            .isoformat(),
+            "starts_at": datetime(2026, 1, 1, 9, 0, 0, tzinfo=UTC).isoformat(),
+            "ends_at": datetime(2026, 1, 1, 17, 0, 0, tzinfo=UTC).isoformat(),
             "organiser_id": 1,
             "venue_id": 1,
-            "created_at": datetime(2025, 12, 31, 12, 0, 0, tzinfo=timezone.utc)
-            .isoformat()
+            "created_at": datetime(2025, 12, 31, 12, 0, 0, tzinfo=UTC).isoformat(),
         },
         {
             "title": "event2",
             "description": "event_description_2",
-            "starts_at": datetime(2026, 1, 2, 9, 0, 0, tzinfo=timezone.utc)
-            .isoformat(),
-            "ends_at": datetime(2026, 1, 2, 17, 0, 0, tzinfo=timezone.utc)
-            .isoformat(),
+            "starts_at": datetime(2026, 1, 2, 9, 0, 0, tzinfo=UTC).isoformat(),
+            "ends_at": datetime(2026, 1, 2, 17, 0, 0, tzinfo=UTC).isoformat(),
             "organiser_id": 2,
             "venue_id": 2,
-            "created_at": datetime(2025, 12, 31, 12, 0, 0, tzinfo=timezone.utc)
-            .isoformat()
+            "created_at": datetime(2025, 12, 31, 12, 0, 0, tzinfo=UTC).isoformat(),
         },
         {
             "title": "event3",
             "description": "event_description_3",
-            "starts_at": datetime(2026, 1, 3, 9, 0, 0, tzinfo=timezone.utc)
-            .isoformat(),
-            "ends_at": datetime(2026, 1, 3, 17, 0, 0, tzinfo=timezone.utc)
-            .isoformat(),
+            "starts_at": datetime(2026, 1, 3, 9, 0, 0, tzinfo=UTC).isoformat(),
+            "ends_at": datetime(2026, 1, 3, 17, 0, 0, tzinfo=UTC).isoformat(),
             "organiser_id": 3,
             "venue_id": 3,
-            "created_at": datetime(2025, 12, 31, 12, 0, 0, tzinfo=timezone.utc)
-            .isoformat()
-        }
+            "created_at": datetime(2025, 12, 31, 12, 0, 0, tzinfo=UTC).isoformat(),
+        },
     ]
 
 
@@ -171,16 +160,16 @@ def add_test_data(create_db_schema, mock_event_tuples):
         users_to_insert = [
             ("user1@email.com", "user_password", "user1"),
             ("user2@email.com", "user_password", "user2"),
-            ("user3@email.com", "user_password", "user3")
+            ("user3@email.com", "user_password", "user3"),
         ]
         user_query = "INSERT INTO users (email, password, name) VALUES %s;"
         execute_values(cur, user_query, users_to_insert)
 
         # Add dummy data to venues
         venues_to_insert = [
-                ('venue1', '1, High Street, Somewhere', 500),
-                ('venue2', '2, High Street, Somewhere', 1500),
-                ('venue3', '3, High Street, Somewhere', 2500)
+            ("venue1", "1, High Street, Somewhere", 500),
+            ("venue2", "2, High Street, Somewhere", 1500),
+            ("venue3", "3, High Street, Somewhere", 2500),
         ]
         venue_query = "INSERT INTO venues (name, address, capacity) VALUES %s"
         execute_values(cur, venue_query, venues_to_insert)
@@ -213,7 +202,7 @@ def client(add_test_data):
     transactions that are executed during the test suite.
     """
     add_test_data.rollback()
-    
+
     def _override_get_db():
         try:
             yield add_test_data
@@ -242,7 +231,7 @@ def user_with_hashed_password(add_test_data):
         user = {
             "name": "dummy user",
             "email": "dummy_user@email.com",
-            "password": hash_password("dummypassword")
+            "password": hash_password("dummypassword"),
         }
         # Convert to tuple so values can be inserted into database
         values_to_insert = (user["name"], user["email"], user["password"])
@@ -253,7 +242,7 @@ def user_with_hashed_password(add_test_data):
             VALUES (%s, %s, %s)
             RETURNING id;
             """,
-            values_to_insert
+            values_to_insert,
         )
         # cur.fetchone() returns a tuple but we want just the id of the newly-created user
         # (which is index [0]) so it can be deleted again in teardown

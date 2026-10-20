@@ -1,9 +1,9 @@
-import psycopg2
 import os
-from dotenv import load_dotenv
-from typing import Generator
-from psycopg2.extensions import connection
+from collections.abc import Generator
 
+import psycopg2
+from dotenv import load_dotenv
+from psycopg2.extensions import connection
 
 load_dotenv()
 
@@ -20,14 +20,14 @@ def get_db_connection() -> Generator[psycopg2.extensions.connection, None, None]
     Establishes a connection to a database using credentials provided as arguments. The connection
     is yielded for use elsewhere.
     """
-    
+
     try:
         conn = psycopg2.connect(
-            dbname=DB_NAME, 
-            host=DB_HOST, 
-            port=DB_PORT, 
-            user=DB_USERNAME, 
-            password=DB_PASSWORD
+            dbname=DB_NAME,
+            host=DB_HOST,
+            port=DB_PORT,
+            user=DB_USERNAME,
+            password=DB_PASSWORD,
         )
 
         yield conn
@@ -36,11 +36,12 @@ def get_db_connection() -> Generator[psycopg2.extensions.connection, None, None]
         if conn:
             conn.close()
 
+
 def create_db_connection() -> connection:
     return psycopg2.connect(
-        dbname=DB_NAME, 
-        host=DB_HOST, 
-        port=DB_PORT, 
-        user=DB_USERNAME, 
-        password=DB_PASSWORD
+        dbname=DB_NAME,
+        host=DB_HOST,
+        port=DB_PORT,
+        user=DB_USERNAME,
+        password=DB_PASSWORD,
     )

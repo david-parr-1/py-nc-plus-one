@@ -1,9 +1,9 @@
+import os
+from datetime import UTC, datetime, timedelta
+
 import bcrypt
 import jwt
-import os
 from dotenv import load_dotenv
-from datetime import datetime, timezone, timedelta
-
 
 load_dotenv()
 
@@ -22,6 +22,6 @@ def verify_password(plain_password: str, hashed: str) -> bool:
 
 
 def create_access_token(user_id: int) -> str:
-    expire = datetime.now(timezone.utc) + timedelta(minutes=JWT_EXPIRY_MINUTES)
+    expire = datetime.now(UTC) + timedelta(minutes=JWT_EXPIRY_MINUTES)
     payload = {"sub": str(user_id), "exp": expire}
     return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)

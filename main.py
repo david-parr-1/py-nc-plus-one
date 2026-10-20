@@ -1,14 +1,14 @@
-import psycopg2
+from datetime import UTC, datetime
+from typing import Annotated
 
-from datetime import datetime, timezone
-from fastapi import FastAPI, HTTPException, Request, status, Depends
+import psycopg2
+from fastapi import Depends, FastAPI, HTTPException, Request, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
-from db.connection import get_db_connection
-from auth.auth import verify_password, create_access_token, hash_password
-from psycopg2.extensions import connection
 
+from auth.auth import create_access_token, hash_password, verify_password
+from db.connection import get_db_connection
 
 app = FastAPI()
 
@@ -24,12 +24,17 @@ class NewUserRequest(BaseModel):
     password: str
 
 
+DBConnection = Annotated[psycopg2.extensions.connection, Depends(get_db_connection)]
+
+
 @app.exception_handler(RequestValidationError)
 def handle_request_validation_error(request: Request, exc: RequestValidationError):
     # This exception handler intercepts validations errors which arise from Pydantic data validation
     # of the incoming request. FastAPI rejects these with code 422 by default. This handler
     # intecepts those erros and returns code 400 BAD REQUEST instead.
-    return JSONResponse(status_code=status.HTTP_400_BAD_REQUEST, content={"error": exc.errors()})
+    return JSONResponse(
+        status_code=status.HTTP_400_BAD_REQUEST, content={"error": exc.errors()}
+    )
 
 
 @app.get("/api/healthcheck")
@@ -38,7 +43,7 @@ def healthcheck():
 
 
 @app.get("/api/events")
-def get_events(conn: psycopg2.extensions.connection = Depends(get_db_connection)):
+def get_events(conn: DBConnection):
     with conn.cursor() as cur:
         cur.execute(
             """
@@ -61,7 +66,7 @@ def get_events(conn: psycopg2.extensions.connection = Depends(get_db_connection)
 
 
 @app.get("/api/events/{event_id}")
-def get_event(event_id: int, conn: psycopg2.extensions.connection = Depends(get_db_connection)):
+def get_event(event_id: int, conn: DBConnection):
     with conn.cursor() as cur:
         cur.execute(
             """
@@ -79,13 +84,13 @@ def get_event(event_id: int, conn: psycopg2.extensions.connection = Depends(get_
             LEFT JOIN venues v on e.venue_id = v.id
             WHERE e.id = %s;
             """,
-            (event_id,)
+            (event_id,),
         )
         row = cur.fetchone()
 
     if row is None:
         raise HTTPException(status_code=404, detail="Event not found")
-    
+
     event_data = {
         "id": row[0],
         "title": row[1],
@@ -95,13 +100,16 @@ def get_event(event_id: int, conn: psycopg2.extensions.connection = Depends(get_
         "location": row[5],
         "address": row[6],
         "capacity": row[7],
-        "created_at": row[8]
+        "created_at": row[8],
     }
     return {"event": event_data}
-    
+
 
 @app.post("/api/auth/login")
-def login_user(payload: CredentialsRequest, conn: psycopg2.extensions.connection = Depends(get_db_connection)):
+def login_user(
+    payload: CredentialsRequest,
+    conn: DBConnection,
+):
     # Retrieve the user's hashed password from the users table to enable password
     # verification
     with conn.cursor() as cur:
@@ -109,7 +117,7 @@ def login_user(payload: CredentialsRequest, conn: psycopg2.extensions.connection
             """
             SELECT email, password, id FROM users WHERE email = %s;
             """,
-            (payload.email,)
+            (payload.email,),
         )
         user = cur.fetchone()
         # Return the same response whether the supplied email address is not in
@@ -117,37 +125,32 @@ def login_user(payload: CredentialsRequest, conn: psycopg2.extensions.connection
         # the passwords do not match
         if user is None or not verify_password(payload.password, user[1]):
             raise HTTPException(status_code=401, detail="Invalid email or password")
-        
+
         token = create_access_token(user[2])
         return {"token": token}
 
 
 @app.post("/api/auth/register", status_code=status.HTTP_201_CREATED)
 def register_user(
-    payload: NewUserRequest, 
-    conn: psycopg2.extensions.connection = Depends(get_db_connection)
+    payload: NewUserRequest,
+    conn: DBConnection,
 ):
     hashed_password = hash_password(payload.password)
-    created_at = datetime.now(timezone.utc)
+    created_at = datetime.now(UTC)
     with conn.cursor() as cur:
-        query = (
-            """
+        query = """
             INSERT INTO users (name, email, password, created_at)
             VALUES (%s, %s, %s, %s)
             ON CONFLICT (email) DO NOTHING
             RETURNING id, name, email, created_at;
             """
-        )
 
-        cur.execute(
-            query,
-            (payload.name, payload.email, hashed_password, created_at)
-        )
+        cur.execute(query, (payload.name, payload.email, hashed_password, created_at))
 
         created_user = cur.fetchone()
 
-    conn.commit()    
-    
+    conn.commit()
+
     if created_user is None:
         raise HTTPException(status_code=409, detail="Email already registered")
 
@@ -156,6 +159,6 @@ def register_user(
             "id": created_user[0],
             "name": created_user[1],
             "email": created_user[2],
-            "created_at": created_user[3]
+            "created_at": created_user[3],
         }
     }
