@@ -1,5 +1,6 @@
 import pytest
 from datetime import datetime, timezone
+from unittest.mock import patch
 
 
 def test_app_handles_invalid_path(client):
@@ -153,3 +154,71 @@ def test_healthcheck_returns_correct_response(client):
     expected_response = {"Healthcheck": "Running"}
     response = client.get("/api/healthcheck")
     assert response.json()["detail"] == expected_response
+
+
+@pytest.mark.parametrize(
+        "incomplete_input",
+        [
+            {"email": "dummy@email.com", "password": "dummypassword"},
+            {"name": "Dummy Name", "password": "dummypassword"},
+            {"name": "Dummy Name", "email": "dummy@email.com"}
+        ]
+)
+def test_register_user_returns_status_400_for_incomplete_request(
+    client,
+    incomplete_input
+):
+    response = client.post("/api/auth/register", json=incomplete_input)
+
+    assert response.status_code == 400
+    assert "error" in response.json()
+
+
+def test_register_user_returns_status_409_for_existing_user(
+        client,
+        user_with_hashed_password):
+    response = client.post(
+        "/api/auth/register", 
+        json={
+            "name": "dummy user", 
+            "email": "dummy_user@email.com", 
+            "password": "dummypassword"
+        }
+    )
+
+    assert response.status_code == 409
+    assert response.json() == {"detail": "Email already registered"}
+
+
+@patch("main.datetime")
+def test_register_user_returns_status_201_for_successful_registration(
+        mock_datetime,
+        client,
+        user_with_hashed_password
+):
+    fixed_timestamp = datetime(2026, 1, 1, 0, 0, 0, tzinfo=timezone.utc)
+
+    mock_datetime.now.return_value = fixed_timestamp
+    
+    response = client.post(
+        "/api/auth/register",
+        json={
+            "name": "New User",
+            "email": "new_user@email.com",
+            "password": "newpassword",
+            "created_at": fixed_timestamp.isoformat()
+        }
+    )
+
+    expected_user_id = user_with_hashed_password + 1
+    expected_response = {
+        "user":{
+            "id": expected_user_id,
+            "name": "New User",
+            "email": "new_user@email.com",
+            "created_at": fixed_timestamp.isoformat()
+        }
+    }
+
+    assert response.status_code == 201
+    assert response.json() == expected_response

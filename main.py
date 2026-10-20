@@ -1,10 +1,12 @@
 import psycopg2
+
+from datetime import datetime, timezone
 from fastapi import FastAPI, HTTPException, Request, status, Depends
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from db.connection import get_db_connection
-from auth.auth import verify_password, create_access_token
+from auth.auth import verify_password, create_access_token, hash_password
 from psycopg2.extensions import connection
 
 
@@ -12,6 +14,12 @@ app = FastAPI()
 
 
 class CredentialsRequest(BaseModel):
+    email: str
+    password: str
+
+
+class NewUserRequest(BaseModel):
+    name: str
     email: str
     password: str
 
@@ -112,3 +120,42 @@ def login_user(payload: CredentialsRequest, conn: psycopg2.extensions.connection
         
         token = create_access_token(user[2])
         return {"token": token}
+
+
+@app.post("/api/auth/register", status_code=status.HTTP_201_CREATED)
+def register_user(
+    payload: NewUserRequest, 
+    conn: psycopg2.extensions.connection = Depends(get_db_connection)
+):
+    hashed_password = hash_password(payload.password)
+    created_at = datetime.now(timezone.utc)
+    with conn.cursor() as cur:
+        query = (
+            """
+            INSERT INTO users (name, email, password, created_at)
+            VALUES (%s, %s, %s, %s)
+            ON CONFLICT (email) DO NOTHING
+            RETURNING id, name, email, created_at;
+            """
+        )
+
+        cur.execute(
+            query,
+            (payload.name, payload.email, hashed_password, created_at)
+        )
+
+        created_user = cur.fetchone()
+
+    conn.commit()    
+    
+    if created_user is None:
+        raise HTTPException(status_code=409, detail="Email already registered")
+
+    return {
+        "user": {
+            "id": created_user[0],
+            "name": created_user[1],
+            "email": created_user[2],
+            "created_at": created_user[3]
+        }
+    }
