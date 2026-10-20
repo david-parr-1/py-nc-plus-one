@@ -230,7 +230,7 @@ def client(add_test_data):
     app.dependency_overrides.clear()
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture(scope="function")
 def user_with_hashed_password(add_test_data):
     """
     Creates a dummy user in the database with a hashed password that can be used for testing
