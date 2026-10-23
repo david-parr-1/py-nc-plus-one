@@ -56,10 +56,10 @@ resource "aws_vpc_security_group_egress_rule" "allow_outbound" {
 
 resource "aws_instance" "ec2_instance" {
   ami                         = data.aws_ami.ubuntu.id
-  instance_type               = "t2.micro"
+  instance_type               = "t3.micro"
   associate_public_ip_address = true
   security_groups             = [aws_security_group.ec2_ssh_sg.name, aws_security_group.ec2_http_sg.name]
-  key_name                    = "DPFirstServer"
+  key_name                    = "dp-key-pair"
 
   tags = {
     Name = "AppServer"

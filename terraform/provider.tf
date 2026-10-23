@@ -11,14 +11,15 @@ terraform {
     }
   }
   backend "s3" {
-    bucket = "dp-tf-deploy"
+    bucket = "dp-tf-states-416775509218-eu-west-2-an"
     key    = "nc-plus-one/terraform.tfstate"
     region = "eu-west-2"
   }
 }
 
 provider "aws" {
-  region = "eu-west-2"
+  region  = "eu-west-2"
+  profile = "dp-de-user"
   default_tags {
     tags = {
       ProjectName  = "NC-Plus-One"
