@@ -1,9 +1,13 @@
+import json
+import os
 from datetime import UTC, datetime
 
+import boto3
 import psycopg2
 import pytest
 from dotenv import load_dotenv
 from fastapi.testclient import TestClient
+from moto import mock_aws
 from psycopg2.extras import execute_values
 from testcontainers.community.postgres import PostgresContainer
 
@@ -255,3 +259,51 @@ def user_with_hashed_password(add_test_data):
     with conn.cursor() as cur:
         cur.execute("TRUNCATE TABLE users RESTART IDENTITY CASCADE;")
     conn.commit()
+
+
+@pytest.fixture(scope="module")
+def mock_aws_credentials():
+    os.environ["AWS_ACCESS_KEY_ID"] = "test"
+    os.environ["AWS_SECRET_ACCESS_KEY"] = "test"
+    os.environ["AWS_DEFAULT_REGION"] = "eu-west-2"
+
+
+@pytest.fixture(scope="function")
+def mock_ssm_client(mock_aws_credentials):
+    with mock_aws():
+        client = boto3.client("ssm", region_name="eu-west-2")
+        yield client
+
+
+@pytest.fixture(scope="function")
+def mock_ssm_parameter(mock_ssm_client):
+    param_name = "/mock/parameter"
+    param_value = "mock_value"
+
+    mock_ssm_client.put_parameter(
+        Name=param_name,
+        Value=param_value,
+        Type="String",
+        Description="Mock parameter for testing",
+        Overwrite=True,
+    )
+
+    yield {"param_name": param_name, "param_value": param_value}
+
+
+@pytest.fixture(scope="function")
+def mock_secretsmanager_client(mock_aws_credentials):
+    with mock_aws():
+        client = boto3.client("secretsmanager", region_name="eu-west-2")
+        yield client
+
+
+@pytest.fixture(scope="function")
+def mock_secret(mock_secretsmanager_client):
+    secret_name = "mock_secret"
+    secret_value = json.dumps({"username": "test_user", "password": "test_password"})
+
+    client = mock_secretsmanager_client
+    client.create_secret(Name=secret_name, SecretString=secret_value)
+
+    yield {"secret_id": secret_name, "secret_value": secret_value}
