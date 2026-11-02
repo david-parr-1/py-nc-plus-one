@@ -5,12 +5,18 @@ import bcrypt
 import jwt
 from dotenv import load_dotenv
 
+from db.connection import fetch_ssm_parameter
+
 load_dotenv()
 
 
-JWT_EXPIRY_MINUTES = int(os.getenv("JWT_EXPIRY_MINUTES"))
-JWT_ALGORITHM = os.getenv("JWT_ALGORITHM")
-JWT_SECRET = os.getenv("JWT_SECRET")
+JWT_EXPIRY_MINUTES = int(os.getenv("JWT_EXPIRY_MINUTES", "30")) or fetch_ssm_parameter(
+    "/nc-plus-one/JWT_EXPIRY_MINUTES"
+)
+JWT_ALGORITHM = os.getenv("JWT_ALGORITHM") or fetch_ssm_parameter(
+    "/nc-plus-one/JWT_ALGORITHM"
+)
+JWT_SECRET = os.getenv("JWT_SECRET") or fetch_ssm_parameter("/nc-plus-one/JWT_SECRET")
 
 
 def hash_password(unhashed_password: str) -> str:

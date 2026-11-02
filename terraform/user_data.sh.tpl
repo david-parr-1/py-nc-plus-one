@@ -15,7 +15,8 @@ apt-get install python3 python3-pip python3-venv -y
 TARGET_DIR="/home/ubuntu/py-nc-plus-one"
 
 echo "Clone Git repository started..." >> /home/ubuntu/start-script-log.txt
-sudo -u ubuntu git clone https://github.com/david-parr-1/py-nc-plus-one.git "$TARGET_DIR"
+sudo -u ubuntu git clone https://github.com/david-parr-1/py-nc-plus-one.git \
+  "$TARGET_DIR"
 
 echo "Changing to repo directory..." >> /home/ubuntu/start-script-log.txt
 cd "$TARGET_DIR"
@@ -30,15 +31,35 @@ sudo -u ubuntu .venv/bin/pip install -r requirements.txt
 echo "Creating .env file..." >> /home/ubuntu/start-script-log.txt
 sudo -u ubuntu tee .env <<EOF
 PYTHONPATH="/home/ubuntu/py-nc-plus-one"
-DB_NAME="${db_name}"
-DB_USERNAME="${db_username}"
-DB_PASSWORD="${db_password}"
-DB_HOST="${db_host}"
-DB_PORT="${db_port}"
-JWT_EXPIRY_MINUTES="${jwt_expiry_minutes}"
-JWT_ALGORITHM="${jwt_algorithm}"
-JWT_SECRET="${jwt_secret}"
 EOF
 
-echo "Starting FastAPI server..." >> /home/ubuntu/start-script-log.txt
-sudo -u ubuntu nohup .venv/bin/uvicorn main:app --host 0.0.0.0 --port 8000 > fastapi
+echo "Adding FastAPI app service to systemd..." >> \
+  /home/ubuntu/start-script-log.txt
+sudo tee /etc/systemd/system/fastapi.service > /dev/null <<'EOF'
+[Unit]
+Description=FastAPI application
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+User=ubuntu
+Group=ubuntu
+WorkingDirectory=/home/ubuntu/py-nc-plus-one
+Environment=PYTHONPATH=/home/ubuntu/py-nc-plus-one
+ExecStart=/home/ubuntu/py-nc-plus-one/.venv/bin/uvicorn \
+  main:app --host 0.0.0.0 --port 8000
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+echo "Writing seed data to DB..." >> /home/ubuntu/start-script-log.txt
+sudo -u ubuntu env PYTHONPATH="$TARGET_DIR" "$TARGET_DIR/.venv/bin/python" \
+  "$TARGET_DIR/db/seed_database.py"
+
+echo "Enabling and starting FastAPI service with systemd..." >> \
+  /home/ubuntu/start-script-log.txt
+sudo systemctl daemon-reload
+sudo systemctl enable --now fastapi

@@ -5,14 +5,21 @@ import psycopg2
 from dotenv import load_dotenv
 from psycopg2.extensions import connection
 
+from src.utils import fetch_secret, fetch_ssm_parameter
+
 load_dotenv()
 
 
-DB_NAME = os.getenv("DB_NAME")
-DB_HOST = os.getenv("DB_HOST")
-DB_PORT = os.getenv("DB_PORT")
-DB_USERNAME = os.getenv("DB_USERNAME")
-DB_PASSWORD = os.getenv("DB_PASSWORD")
+DB_NAME = os.getenv("DB_NAME") or fetch_ssm_parameter("/nc-plus-one/DB_NAME")
+DB_HOST = os.getenv("DB_HOST") or fetch_ssm_parameter("/nc-plus-one/DB_HOST")
+DB_PORT = os.getenv("DB_PORT") or fetch_ssm_parameter("/nc-plus-one/DB_PORT")
+DB_USERNAME = os.getenv("DB_USERNAME") or fetch_ssm_parameter(
+    "/nc-plus-one/DB_USERNAME"
+)
+DB_SECRET_ARN = os.getenv("DB_SECRET_ARN") or fetch_ssm_parameter(
+    "/nc-plus-one/DB_SECRET_ARN"
+)
+DB_PASSWORD = os.getenv("DB_PASSWORD") or fetch_secret(DB_SECRET_ARN).get("password")
 
 
 def get_db_connection() -> Generator[psycopg2.extensions.connection, None, None]:

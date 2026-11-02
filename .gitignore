@@ -12,3 +12,4 @@ Portfolio - nc-plus-one - Deployment.md
 **/.terraform/*
 *.tfstate
 *.tfstate.*
+terraform/*.tfvars
