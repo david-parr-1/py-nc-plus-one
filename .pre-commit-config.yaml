@@ -1,9 +1,8 @@
 repos:
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.16.6
+    rev: v0.17.3
     hooks:
       - id: ruff
-        args: [--fix]
       - id: ruff-format
 
   - repo: local
@@ -15,4 +14,10 @@ repos:
         types: [python]
         pass_filenames: false
         always_run: true
-        
+  
+  - repo: http://github.com/PyCQA/bandit
+    rev: 1.9.4
+    hooks:
+      - id: bandit
+        name: bandit-security-check
+        args: ["-ll", "--skip", "B101"]
