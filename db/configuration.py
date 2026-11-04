@@ -6,8 +6,8 @@ from dotenv import load_dotenv
 from src.utils import fetch_secret, fetch_ssm_parameter
 
 
-class Config:
-    _instance: "Config | None" = None
+class DBConfig:
+    _instance: "DBConfig | None" = None
 
     def __init__(self) -> None:
         load_dotenv()
@@ -31,6 +31,25 @@ class Config:
             self.db_password = os.getenv("DB_PASSWORD") or fetch_secret(
                 self._db_secret_arn
             ).get("password")
+            print("DB Configuration initialised successfully.")
+
+        except (BotoCoreError, ClientError) as err:
+            print(f"DB Configuration did not initialise successfully: {err}")
+            raise
+
+    @classmethod
+    def get_config(cls) -> "DBConfig":
+        if cls._instance is None:
+            cls._instance = cls()
+        return cls._instance
+
+
+class JWTConfig:
+    _instance: "JWTConfig | None" = None
+
+    def __init__(self) -> None:
+        load_dotenv()
+        try:
             self.jwt_expiry_minutes = int(
                 os.getenv("JWT_EXPIRY_MINUTES", "30")
             ) or fetch_ssm_parameter("/nc-plus-one/JWT_EXPIRY_MINUTES")
@@ -40,14 +59,14 @@ class Config:
             self.jwt_secret = os.getenv("JWT_SECRET") or fetch_ssm_parameter(
                 "/nc-plus-one/JWT_SECRET"
             )
-            print("Configuration initialised successfully.")
+            print("JWT Configuration initialised successfully.")
 
         except (BotoCoreError, ClientError) as err:
-            print(f"Configuration did not initialise successfully: {err}")
+            print(f"JWT Configuration did not initialise successfully: {err}")
             raise
 
     @classmethod
-    def get_config(cls) -> "Config":
+    def get_config(cls) -> "JWTConfig":
         if cls._instance is None:
             cls._instance = cls()
         return cls._instance

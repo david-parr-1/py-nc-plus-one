@@ -143,7 +143,7 @@ def test_auth_login_returns_401_for_incorrect_password(
 
 
 def test_auth_login_returns_200_for_valid_credentials(
-    client, user_with_hashed_password
+    client, user_with_hashed_password, test_jwt_config
 ):
     response = client.post(
         "/api/auth/login",

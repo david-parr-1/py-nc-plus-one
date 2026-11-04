@@ -3,7 +3,7 @@ from collections.abc import Generator
 import psycopg2
 from psycopg2.extensions import connection
 
-from db.configuration import Config
+from db.configuration import DBConfig
 
 
 def get_db_connection() -> Generator[psycopg2.extensions.connection, None, None]:
@@ -13,7 +13,7 @@ def get_db_connection() -> Generator[psycopg2.extensions.connection, None, None]
     """
 
     try:
-        config = Config.get_config()
+        config = DBConfig.get_config()
         conn = psycopg2.connect(
             dbname=config.db_name,
             host=config.db_host,
@@ -30,7 +30,7 @@ def get_db_connection() -> Generator[psycopg2.extensions.connection, None, None]
 
 
 def create_db_connection() -> connection:
-    config = Config.get_config()
+    config = DBConfig.get_config()
     return psycopg2.connect(
         dbname=config.db_name,
         host=config.db_host,
