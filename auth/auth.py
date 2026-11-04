@@ -1,22 +1,9 @@
-import os
 from datetime import UTC, datetime, timedelta
 
 import bcrypt
 import jwt
-from dotenv import load_dotenv
 
-from db.connection import fetch_ssm_parameter
-
-load_dotenv()
-
-
-JWT_EXPIRY_MINUTES = int(os.getenv("JWT_EXPIRY_MINUTES", "30")) or fetch_ssm_parameter(
-    "/nc-plus-one/JWT_EXPIRY_MINUTES"
-)
-JWT_ALGORITHM = os.getenv("JWT_ALGORITHM") or fetch_ssm_parameter(
-    "/nc-plus-one/JWT_ALGORITHM"
-)
-JWT_SECRET = os.getenv("JWT_SECRET") or fetch_ssm_parameter("/nc-plus-one/JWT_SECRET")
+from db.configuration import JWTConfig
 
 
 def hash_password(unhashed_password: str) -> str:
@@ -28,6 +15,7 @@ def verify_password(plain_password: str, hashed: str) -> bool:
 
 
 def create_access_token(user_id: int) -> str:
-    expire = datetime.now(UTC) + timedelta(minutes=JWT_EXPIRY_MINUTES)
+    config = JWTConfig.get_config()
+    expire = datetime.now(UTC) + timedelta(minutes=config.jwt_expiry_minutes)
     payload = {"sub": str(user_id), "exp": expire}
-    return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
+    return jwt.encode(payload, config.jwt_secret, algorithm=config.jwt_algorithm)

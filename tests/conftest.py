@@ -12,6 +12,7 @@ from psycopg2.extras import execute_values
 from testcontainers.community.postgres import PostgresContainer
 
 from auth.auth import hash_password
+from db.configuration import JWTConfig
 from db.connection import get_db_connection
 from main import app
 
@@ -307,3 +308,13 @@ def mock_secret(mock_secretsmanager_client):
     client.create_secret(Name=secret_name, SecretString=secret_value)
 
     yield {"secret_id": secret_name, "secret_value": secret_value}
+
+
+@pytest.fixture
+def test_jwt_config(monkeypatch):
+    monkeypatch.setenv("JWT_EXPIRY_MINUTES", "30")
+    monkeypatch.setenv("JWT_ALGORITHM", "HS256")
+    monkeypatch.setenv("JWT_SECRET", "test-secret-test-secret-test-secret")
+
+    monkeypatch.setattr(JWTConfig, "_instance", None)
+    return JWTConfig.get_config()
