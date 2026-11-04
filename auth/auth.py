@@ -5,7 +5,7 @@ import bcrypt
 import jwt
 from dotenv import load_dotenv
 
-from db.connection import fetch_ssm_parameter
+from src.utils import fetch_ssm_parameter
 
 load_dotenv()
 
