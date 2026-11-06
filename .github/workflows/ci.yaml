@@ -2,7 +2,7 @@ name: py-nc-plus-one Workflow
 
 on:
   push:
-    branches: ["main"]
+    branches: ["**"] # Includes pushes, excludes tags.
   pull_request:
     branches: ["main"]
 
@@ -10,7 +10,7 @@ jobs:
   static-and-unit-tests:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout Code
+      - name: Checkout Repository
         uses: actions/checkout@v7
 
       - name: Set up Python
@@ -37,3 +37,74 @@ jobs:
 
       - name: Run Pytest
         run: python -m pytest -v
+
+  terraform-validate-and-plan:
+    if: >-
+      github.event_name == 'push' ||
+      (github.event_name == 'pull_request' &&
+      github.event.pull_request.head.repo.full_name == github.repository)
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    defaults:
+      run:
+        working-directory: terraform
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v7
+
+      - name: Configure AWS Credentials via OIDC
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::416775509218:role/GH-TF-Plan-and-Validate
+          aws-region: eu-west-2
+          role-session-name: GitHubActionsTerraformSession
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v4
+        with:
+          terraform_version: "1.17.1"
+
+      - name: Terraform Init
+        run: terraform init
+
+      - name: Terraform Validate
+        run: terraform validate
+
+      - name: Terraform Plan
+        run: terraform plan
+
+  terraform-deploy:
+    name: Terraform Apply (Deploy)
+    needs: terraform-validate-and-plan
+    # Ensures deployment ONLY happens on a push to main (merge event)
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    defaults:
+      run:
+        working-directory: terraform
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v7
+
+      - name: Configure AWS Credentials via OIDC
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::416775509218:role/GH-TF-Deploy
+          aws-region: eu-west-2
+          role-session-name: GitHubActionsTerraformSession
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v4
+
+      - name: Terraform Init
+        run: terraform init
+
+      - name: Terraform Apply
+        run: terraform apply -auto-approve
