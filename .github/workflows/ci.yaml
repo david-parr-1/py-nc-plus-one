@@ -50,6 +50,11 @@ jobs:
     defaults:
       run:
         working-directory: terraform
+    env:
+      TF_VAR_jwt_secret: ${{ secrets.TF_JWT_SECRET }}
+      TF_VAR_jwt_expiry_minutes: ${{ vars.TF_JWT_EXPIRY_MINUTES }}
+      TF_VAR_jwt_algorithm: ${{ vars.TF_JWT_ALGORITHM }}
+
 
     steps:
       - name: Checkout Repository
@@ -88,6 +93,10 @@ jobs:
     defaults:
       run:
         working-directory: terraform
+    env:
+      TF_VAR_jwt_secret: ${{ secrets.TF_JWT_SECRET }}
+      TF_VAR_jwt_expiry_minutes: ${{ vars.TF_JWT_EXPIRY_MINUTES }}
+      TF_VAR_jwt_algorithm: ${{ vars.TF_JWT_ALGORITHM }}
 
     steps:
       - name: Checkout Repository
