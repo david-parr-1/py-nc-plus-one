@@ -2,9 +2,9 @@ name: py-nc-plus-one Workflow
 
 on:
   push:
-    branches: ["**"] # Includes pushes, excludes tags.
+    branches: ["main", "staging"]
   pull_request:
-    branches: ["main"]
+    branches: ["main", "staging"]
 
 jobs:
   static-and-unit-tests:
