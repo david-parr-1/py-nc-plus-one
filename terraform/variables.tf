@@ -16,11 +16,11 @@ variable "jwt_algorithm" {
 }
 
 variable "environment" {
-  type = "string"
+  type        = string
   description = "Deployment environment"
 
   validation {
-    condition = contains(["staging", "production"], var.environment)
+    condition     = contains(["staging", "production"], var.environment)
     error_message = "environment must be staging or production"
   }
 }

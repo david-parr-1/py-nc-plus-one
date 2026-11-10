@@ -1,6 +1,6 @@
 locals {
   name_suffix = var.environment == "production" ? "" : "-${var.environment}"
-  ssm_path = var.environment == "production" ? "/nc-plus-one" : "/nc-plus-one/${var.environment}"
+  ssm_path    = var.environment == "production" ? "/nc-plus-one" : "/nc-plus-one/${var.environment}"
 }
 
 data "aws_ami" "ubuntu" {
@@ -105,7 +105,7 @@ resource "aws_db_instance" "app_db" {
 resource "aws_ssm_parameter" "app_db_host" {
   name  = "${local.ssm_path}/DB_HOST"
   type  = "String"
-  value = aws_db_instance.ap_db.address
+  value = aws_db_instance.app_db.address
 }
 
 resource "aws_ssm_parameter" "app_db_port" {
