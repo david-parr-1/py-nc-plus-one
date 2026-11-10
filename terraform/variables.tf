@@ -14,3 +14,13 @@ variable "jwt_algorithm" {
   type        = string
   description = "JWT token creation algorithm"
 }
+
+variable "environment" {
+  type = "string"
+  description = "Deployment environment"
+
+  validation {
+    condition = contains(["staging", "production"], var.environment)
+    error_message = "environment must be staging or production"
+  }
+}

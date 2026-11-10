@@ -1,5 +1,5 @@
 resource "aws_iam_role" "ec2_app_role" {
-  name               = "ec2-assume-role"
+  name               = "ec2-assume-role${local.name_suffix}"
   assume_role_policy = data.aws_iam_policy_document.ec2_assume_role.json
 }
 
@@ -16,7 +16,7 @@ data "aws_iam_policy_document" "ec2_assume_role" {
 }
 
 resource "aws_iam_policy" "get_db_parameters" {
-  name        = "get-db-parameters"
+  name        = "get-db-parameters${local.name_suffix}"
   description = "Allow retrieval of DB parameters from SSM and Secrets Manager"
 
   policy = jsonencode(

@@ -2,12 +2,35 @@ name: py-nc-plus-one Workflow
 
 on:
   push:
-    branches: ["main", "staging"]
+    branches: [main, staging]
   pull_request:
-    branches: ["main", "staging"]
+    branches: [main, staging]
+  workflow_dispatch:
+    inputs:
+      action:
+        description: "Select deployment option"
+        required: true
+        type: choice
+        options:
+          - apply
+          - destroy
+      environment:
+        description: "Choose the deployment environment"
+        required: true
+        type: choice
+        options:
+          - staging
+          - production
 
 jobs:
+
   static-and-unit-tests:
+    if: >-
+      (github.event_name == 'push' &&
+       (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/staging')) ||
+      (github.event_name == 'pull_request' &&
+       (github.base_ref == 'main' || github.base_ref == 'staging') &&
+       github.event.pull_request.head.repo.full_name == github.repository)
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Repository
@@ -40,9 +63,19 @@ jobs:
 
   terraform-validate-and-plan:
     if: >-
-      github.event_name == 'push' ||
+      (github.event_name == 'push' &&
+       (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/staging')) ||
       (github.event_name == 'pull_request' &&
-      github.event.pull_request.head.repo.full_name == github.repository)
+       (github.base_ref == 'main' || github.base_ref == 'staging') &&
+       github.event.pull_request.head.repo.full_name == github.repository) ||
+      (github.event_name == 'workflow_dispatch' &&
+       inputs.action == 'apply')
+    environment: 
+      name: >-
+        ${{ inputs.environment ||
+          (github.base_ref == 'main' && 'production') ||
+          (github.ref_name == 'main' && 'production') ||
+          'staging' }}
     runs-on: ubuntu-latest
     permissions:
       id-token: write
@@ -51,10 +84,15 @@ jobs:
       run:
         working-directory: terraform
     env:
+      TF_VAR_environment: >-
+        ${{ inputs.environment ||
+          (github.base_ref == 'main' && 'production') ||
+          (github.ref_name == 'main' && 'production') ||
+          'staging' }}
       TF_VAR_jwt_secret: ${{ secrets.TF_JWT_SECRET }}
       TF_VAR_jwt_expiry_minutes: ${{ vars.TF_JWT_EXPIRY_MINUTES }}
       TF_VAR_jwt_algorithm: ${{ vars.TF_JWT_ALGORITHM }}
-
+      TF_STATE_KEY: ${{ vars.TF_STATE_KEY }}
 
     steps:
       - name: Checkout Repository
@@ -63,7 +101,7 @@ jobs:
       - name: Configure AWS Credentials via OIDC
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: arn:aws:iam::416775509218:role/GH-TF-Plan-and-Validate
+          role-to-assume: ${{ vars.AWS_PLAN_ROLE_ARN }}
           aws-region: eu-west-2
           role-session-name: GitHubActionsTerraformSession
 
@@ -73,7 +111,7 @@ jobs:
           terraform_version: "1.17.1"
 
       - name: Terraform Init
-        run: terraform init
+        run: terraform init -reconfigure -backend-config="key=${TF_STATE_KEY}"
 
       - name: Terraform Validate
         run: terraform validate
@@ -82,10 +120,20 @@ jobs:
         run: terraform plan
 
   terraform-deploy:
-    name: Terraform Apply (Deploy)
+    name: >-
+      Terraform deploy
+        ${{ inputs.environment ||
+        (github.base_ref == 'main' && 'production') ||
+        (github.ref_name == 'main' && 'production') ||
+        'staging' }} environment
     needs: terraform-validate-and-plan
-    # Ensures deployment ONLY happens on a push to main (merge event)
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    environment: 
+      name: >-
+        ${{ inputs.environment ||
+          (github.base_ref == 'main' && 'production') ||
+          (github.ref_name == 'main' && 'production') ||
+          'staging' }}
+    if: (github.event_name == 'workflow_dispatch' && inputs.action == 'apply')
     runs-on: ubuntu-latest
     permissions:
       id-token: write
@@ -94,9 +142,15 @@ jobs:
       run:
         working-directory: terraform
     env:
+      TF_VAR_environment: >-
+        ${{ inputs.environment ||
+          (github.base_ref == 'main' && 'production') ||
+          (github.ref_name == 'main' && 'production') ||
+          'staging' }}
       TF_VAR_jwt_secret: ${{ secrets.TF_JWT_SECRET }}
       TF_VAR_jwt_expiry_minutes: ${{ vars.TF_JWT_EXPIRY_MINUTES }}
       TF_VAR_jwt_algorithm: ${{ vars.TF_JWT_ALGORITHM }}
+      TF_STATE_KEY: ${{ vars.TF_STATE_KEY }}
 
     steps:
       - name: Checkout Repository
@@ -105,7 +159,7 @@ jobs:
       - name: Configure AWS Credentials via OIDC
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: arn:aws:iam::416775509218:role/GH-TF-Deploy
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
           aws-region: eu-west-2
           role-session-name: GitHubActionsTerraformSession
 
@@ -113,7 +167,59 @@ jobs:
         uses: hashicorp/setup-terraform@v4
 
       - name: Terraform Init
-        run: terraform init
+        run: terraform init -reconfigure -backend-config="key=${TF_STATE_KEY}"
 
       - name: Terraform Apply
         run: terraform apply -auto-approve
+
+  terraform-destroy:
+    name: >-
+      Terraform destroy
+        ${{ inputs.environment ||
+        (github.base_ref == 'main' && 'production') ||
+        (github.ref_name == 'main' && 'production') ||
+        'staging' }} environment
+    environment: 
+      name: >-
+        ${{ inputs.environment ||
+          (github.base_ref == 'main' && 'production') ||
+          (github.ref_name == 'main' && 'production') ||
+          'staging' }}
+    if: (github.event_name == 'workflow_dispatch' && inputs.action == 'destroy')
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    defaults:
+      run:
+        working-directory: terraform
+    env:
+      TF_VAR_environment: >-
+        ${{ inputs.environment ||
+          (github.base_ref == 'main' && 'production') ||
+          (github.ref_name == 'main' && 'production') ||
+          'staging' }}
+      TF_VAR_jwt_secret: ${{ secrets.TF_JWT_SECRET }}
+      TF_VAR_jwt_expiry_minutes: ${{ vars.TF_JWT_EXPIRY_MINUTES }}
+      TF_VAR_jwt_algorithm: ${{ vars.TF_JWT_ALGORITHM }}
+      TF_STATE_KEY: ${{ vars.TF_STATE_KEY }}
+      
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v7
+
+      - name: Configure AWS Credentials via OIDC
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: eu-west-2
+          role-session-name: GitHubActionsTerraformSession
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v4
+
+      - name: Terraform Init
+        run: terraform init -reconfigure -backend-config="key=${TF_STATE_KEY}"
+
+      - name: Terraform Destroy
+        run: terraform destroy -auto-approve
