@@ -23,6 +23,7 @@ provider "aws" {
   default_tags {
     tags = {
       ProjectName  = "NC-Plus-One"
+      Environment  = "${var.environment}"
       DeployedFrom = "Terraform"
       Repository   = "https://github.com/david-parr-1/py-nc-plus-one.git"
     }

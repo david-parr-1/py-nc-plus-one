@@ -67,6 +67,9 @@ resource "aws_instance" "ec2_instance" {
   associate_public_ip_address = true
   security_groups             = [aws_security_group.ec2_ssh_sg.name, aws_security_group.ec2_http_sg.name]
   key_name                    = "dp-key-pair"
+  user_data = templatefile("user_data.sh.tpl", {
+    ssm_parameter_prefix = "${local.ssm_path}"
+  })
 
   tags = {
     Name = "AppServer${local.name_suffix}"

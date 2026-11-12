@@ -13,20 +13,17 @@ class DBConfig:
         load_dotenv()
         try:
             self.aws_region = os.getenv("AWS_REGION", "eu-west-2")
-            self.db_host = os.getenv("DB_HOST") or fetch_ssm_parameter(
-                "/nc-plus-one/DB_HOST"
+            self.ssm_parameter_prefix = os.getenv(
+                "SSM_PARAMETER_PREFIX", "/nc-plus-one"
             )
-            self.db_port = os.getenv("DB_PORT") or fetch_ssm_parameter(
-                "/nc-plus-one/DB_PORT"
+            self.db_host = os.getenv("DB_HOST") or self.get_parameter_name("DB_HOST")
+            self.db_port = os.getenv("DB_PORT") or self.get_parameter_name("DB_PORT")
+            self.db_name = os.getenv("DB_NAME") or self.get_parameter_name("DB_NAME")
+            self.db_username = os.getenv("DB_USERNAME") or self.get_parameter_name(
+                "DB_USERNAME"
             )
-            self.db_name = os.getenv("DB_NAME") or fetch_ssm_parameter(
-                "/nc-plus-one/DB_NAME"
-            )
-            self.db_username = os.getenv("DB_USERNAME") or fetch_ssm_parameter(
-                "/nc-plus-one/DB_USERNAME"
-            )
-            self._db_secret_arn = os.getenv("DB_SECRET_ARN") or fetch_ssm_parameter(
-                "/nc-plus-one/DB_SECRET_ARN"
+            self._db_secret_arn = os.getenv("DB_SECRET_ARN") or self.get_parameter_name(
+                "DB_SECRET_ARN"
             )
             self.db_password = os.getenv("DB_PASSWORD") or fetch_secret(
                 self._db_secret_arn
@@ -36,6 +33,9 @@ class DBConfig:
         except (BotoCoreError, ClientError) as err:
             print(f"DB Configuration did not initialise successfully: {err}")
             raise
+
+    def get_parameter_name(self, parameter: str) -> str:
+        return fetch_ssm_parameter(f"{self.ssm_parameter_prefix}/{parameter}")
 
     @classmethod
     def get_config(cls) -> "DBConfig":

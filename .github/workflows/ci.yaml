@@ -70,7 +70,7 @@ jobs:
        github.event.pull_request.head.repo.full_name == github.repository) ||
       (github.event_name == 'workflow_dispatch' &&
        inputs.action == 'apply')
-    environment: 
+    environment:
       name: >-
         ${{ inputs.environment ||
           (github.base_ref == 'main' && 'production') ||
@@ -127,7 +127,7 @@ jobs:
         (github.ref_name == 'main' && 'production') ||
         'staging' }} environment
     needs: terraform-validate-and-plan
-    environment: 
+    environment:
       name: >-
         ${{ inputs.environment ||
           (github.base_ref == 'main' && 'production') ||
@@ -179,7 +179,7 @@ jobs:
         (github.base_ref == 'main' && 'production') ||
         (github.ref_name == 'main' && 'production') ||
         'staging' }} environment
-    environment: 
+    environment:
       name: >-
         ${{ inputs.environment ||
           (github.base_ref == 'main' && 'production') ||
@@ -203,7 +203,7 @@ jobs:
       TF_VAR_jwt_expiry_minutes: ${{ vars.TF_JWT_EXPIRY_MINUTES }}
       TF_VAR_jwt_algorithm: ${{ vars.TF_JWT_ALGORITHM }}
       TF_STATE_KEY: ${{ vars.TF_STATE_KEY }}
-      
+
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v7
