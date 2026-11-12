@@ -57,7 +57,7 @@ class JWTConfig:
                 "JWT_EXPIRY_MINUTES"
             ) or self.get_parameter_name("JWT_EXPIRY_MINUTES")
             self.jwt_algorithm = os.getenv("JWT_ALGORITHM") or self.get_parameter_name(
-                "JWT_EXPIRY_MINUTES"
+                "JWT_ALGORITHM"
             )
             self.jwt_secret = os.getenv("JWT_SECRET") or self.get_parameter_name(
                 "JWT_SECRET"
