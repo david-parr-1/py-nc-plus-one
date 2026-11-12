@@ -60,8 +60,18 @@ resource "aws_vpc_security_group_egress_rule" "allow_outbound" {
 }
 
 resource "aws_instance" "ec2_instance" {
-  ami                         = data.aws_ami.ubuntu.id
-  depends_on                  = [aws_db_instance.app_db]
+  ami = data.aws_ami.ubuntu.id
+  depends_on = [
+    aws_db_instance.app_db,
+    aws_ssm_parameter.app_db_host,
+    aws_ssm_parameter.app_db_name,
+    aws_ssm_parameter.app_db_port,
+    aws_ssm_parameter.app_db_username,
+    aws_ssm_parameter.db_secret_arn,
+    aws_ssm_parameter.jwt_algorithm,
+    aws_ssm_parameter.jwt_expiry_minutes,
+    aws_ssm_parameter.jwt_secret
+  ]
   instance_type               = "t3.micro"
   iam_instance_profile        = aws_iam_instance_profile.ec2_instance_profile.name
   associate_public_ip_address = true
@@ -84,6 +94,11 @@ resource "aws_iam_instance_profile" "ec2_instance_profile" {
 output "ec2_ip" {
   description = "Public IP address of the created EC2 instance"
   value       = aws_instance.ec2_instance.public_ip
+}
+
+output "ec2_instance_id" {
+  description = "Instance ID of the EC2 instance"
+  value       = aws_instance.ec2_instance.id
 }
 
 resource "aws_db_instance" "app_db" {
