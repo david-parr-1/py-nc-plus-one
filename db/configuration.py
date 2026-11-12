@@ -50,20 +50,26 @@ class JWTConfig:
     def __init__(self) -> None:
         load_dotenv()
         try:
-            self.jwt_expiry_minutes = int(
-                os.getenv("JWT_EXPIRY_MINUTES", "30")
-            ) or fetch_ssm_parameter("/nc-plus-one/JWT_EXPIRY_MINUTES")
-            self.jwt_algorithm = os.getenv("JWT_ALGORITHM") or fetch_ssm_parameter(
-                "/nc-plus-one/JWT_ALGORITHM"
+            self.ssm_parameter_prefix = os.getenv(
+                "SSM_PARAMETER_PREFIX", "/nc-plus-one"
             )
-            self.jwt_secret = os.getenv("JWT_SECRET") or fetch_ssm_parameter(
-                "/nc-plus-one/JWT_SECRET"
+            self.jwt_expiry_minutes = os.getenv(
+                "JWT_EXPIRY_MINUTES"
+            ) or self.get_parameter_name("JWT_EXPIRY_MINUTES")
+            self.jwt_algorithm = os.getenv("JWT_ALGORITHM") or self.get_parameter_name(
+                "JWT_EXPIRY_MINUTES"
+            )
+            self.jwt_secret = os.getenv("JWT_SECRET") or self.get_parameter_name(
+                "JWT_SECRET"
             )
             print("JWT Configuration initialised successfully.")
 
         except (BotoCoreError, ClientError) as err:
             print(f"JWT Configuration did not initialise successfully: {err}")
             raise
+
+    def get_parameter_name(self, parameter: str) -> str:
+        return fetch_ssm_parameter(f"{self.ssm_parameter_prefix}/{parameter}")
 
     @classmethod
     def get_config(cls) -> "JWTConfig":
