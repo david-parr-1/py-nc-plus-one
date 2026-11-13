@@ -30,7 +30,9 @@ jobs:
        (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/staging')) ||
       (github.event_name == 'pull_request' &&
        (github.base_ref == 'main' || github.base_ref == 'staging') &&
-       github.event.pull_request.head.repo.full_name == github.repository)
+       github.event.pull_request.head.repo.full_name == github.repository) ||
+      (github.event_name == 'workflow_dispatch' &&
+       inputs.action == 'apply')
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Repository
@@ -223,3 +225,63 @@ jobs:
 
       - name: Terraform Destroy
         run: terraform destroy -auto-approve
+
+  deploy-app-code:
+    name: Deploy App Code
+    needs: 
+      - static-and-unit-tests
+      - terraform-deploy
+    environment:
+      name: >-
+        ${{ inputs.environment ||
+          (github.base_ref == 'main' && 'production') ||
+          (github.ref_name == 'main' && 'production') ||
+          'staging' }}
+    if: (github.event_name == 'workflow_dispatch' && inputs.action == 'apply')
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v7
+
+      - name: Configure AWS Credentials via OIDC
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_CODE_DEPLOY_ROLE_ARN }}
+          aws-region: eu-west-2
+          role-session-name: GitHubActionsCodeDeploySession
+
+      - name: Deploy Code via SSM
+        env:
+          DEPLOY_BRANCH: ${{ inputs.environment == 'production' && 'main' || 'staging' }}
+        run: |
+          commands=$(cat <<EOF
+          set -e
+          APP_DIR=/home/ubuntu/py-nc-plus-one
+          BRANCH=${DEPLOY_BRANCH}
+
+          runuser -u ubuntu -- \\
+            git -C "\$APP_DIR" fetch origin "\$BRANCH"
+
+          runuser -u ubuntu -- \\
+            git -C "\$APP_DIR" reset --hard "origin/\$BRANCH"
+
+          runuser -u ubuntu -- \\
+            "\$APP_DIR/.venv/bin/pip" install \\
+            -r "\$APP_DIR/requirements.txt"
+
+          systemctl restart fastapi
+          systemctl is-active --quiet fastapi
+          EOF
+          )
+
+          aws ssm send-command \
+            --document-name "AWS-RunShellScript" \
+            --targets \
+              "Key=tag:Environment,Values=${{ inputs.environment }}" \
+              "Key=tag:SSMDeploy,Values=true" \
+            --parameters "$(jq -cn --arg script "$commands" '{commands: [$script]}')" \
+            --region eu-west-2
