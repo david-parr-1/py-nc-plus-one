@@ -32,14 +32,6 @@ resource "aws_security_group" "ec2_ssh_sg" {
   description = "Allows SSH traffic in from my IP only"
 }
 
-resource "aws_vpc_security_group_ingress_rule" "allow_ssh" {
-  security_group_id = aws_security_group.ec2_ssh_sg.id
-  cidr_ipv4         = "${chomp(data.http.myip.response_body)}/32"
-  from_port         = 22
-  to_port           = 22
-  ip_protocol       = "tcp"
-}
-
 resource "aws_security_group" "ec2_http_sg" {
   name        = "ec2-http-sg${local.name_suffix}"
   description = "Allows HTTP traffic from any IP"
@@ -82,23 +74,14 @@ resource "aws_instance" "ec2_instance" {
   })
 
   tags = {
-    Name = "AppServer${local.name_suffix}"
+    Name      = "AppServer${local.name_suffix}"
+    SSMDeploy = "true"
   }
 }
 
 resource "aws_iam_instance_profile" "ec2_instance_profile" {
   name = "ec2-instance-profile${local.name_suffix}"
   role = aws_iam_role.ec2_app_role.name
-}
-
-output "ec2_ip" {
-  description = "Public IP address of the created EC2 instance"
-  value       = aws_instance.ec2_instance.public_ip
-}
-
-output "ec2_instance_id" {
-  description = "Instance ID of the EC2 instance"
-  value       = aws_instance.ec2_instance.id
 }
 
 resource "aws_db_instance" "app_db" {
