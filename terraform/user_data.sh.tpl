@@ -15,7 +15,9 @@ apt-get install python3 python3-pip python3-venv -y
 TARGET_DIR="/home/ubuntu/py-nc-plus-one"
 
 echo "Clone Git repository started..." >> /home/ubuntu/start-script-log.txt
-sudo -u ubuntu git clone https://github.com/david-parr-1/py-nc-plus-one.git \
+sudo -u ubuntu git clone \
+  --branch feature/add-automated-terraform-deployment \
+  https://github.com/david-parr-1/py-nc-plus-one.git \
   "$TARGET_DIR"
 
 echo "Changing to repo directory..." >> /home/ubuntu/start-script-log.txt
@@ -46,6 +48,7 @@ User=ubuntu
 Group=ubuntu
 WorkingDirectory=/home/ubuntu/py-nc-plus-one
 Environment=PYTHONPATH=/home/ubuntu/py-nc-plus-one
+Environment=SSM_PARAMETER_PREFIX="${ssm_parameter_prefix}"
 ExecStart=/home/ubuntu/py-nc-plus-one/.venv/bin/uvicorn \
   main:app --host 0.0.0.0 --port 8000
 Restart=on-failure
@@ -56,7 +59,10 @@ WantedBy=multi-user.target
 EOF
 
 echo "Writing seed data to DB..." >> /home/ubuntu/start-script-log.txt
-sudo -u ubuntu env PYTHONPATH="$TARGET_DIR" "$TARGET_DIR/.venv/bin/python" \
+sudo -u ubuntu env \
+  PYTHONPATH="$TARGET_DIR" \
+  SSM_PARAMETER_PREFIX="${ssm_parameter_prefix}" \
+  "$TARGET_DIR/.venv/bin/python" \
   "$TARGET_DIR/db/seed_database.py"
 
 echo "Enabling and starting FastAPI service with systemd..." >> \
