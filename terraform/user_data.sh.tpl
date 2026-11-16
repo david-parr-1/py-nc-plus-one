@@ -16,7 +16,7 @@ TARGET_DIR="/home/ubuntu/py-nc-plus-one"
 
 echo "Clone Git repository started..." >> /home/ubuntu/start-script-log.txt
 sudo -u ubuntu git clone \
-  --branch feature/add-automated-terraform-deployment \
+  --branch "${repo_branch}" \
   https://github.com/david-parr-1/py-nc-plus-one.git \
   "$TARGET_DIR"
 
@@ -53,10 +53,49 @@ ExecStart=/home/ubuntu/py-nc-plus-one/.venv/bin/uvicorn \
   main:app --host 0.0.0.0 --port 8000
 Restart=on-failure
 RestartSec=5
+StandardOutput=append:/var/log/fastapi.log
+StandardError=append:/var/log/fastapi.log
 
 [Install]
 WantedBy=multi-user.target
 EOF
+
+echo "Installing CloudWatch agent" >> /home/ubuntu/start-script-log.txt
+AGENT_URL="https://amazoncloudwatch-agent-${aws_region}.s3.${aws_region}"\
+".amazonaws.com/ubuntu/amd64/latest/amazon-cloudwatch-agent.deb"
+curl -fsSLo /tmp/amazon-cloudwatch-agent.deb "$AGENT_URL"
+dpkg -i /tmp/amazon-cloudwatch-agent.deb
+
+echo "Configuring CloudWatch agent" >> /home/ubuntu/start-script-log.txt
+sudo install -d -m 0755 /opt/aws/amazon-cloudwatch-agent/etc
+
+sudo tee /opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.json \
+  >/dev/null <<EOF
+{
+  "agent": {
+    "region": "${aws_region}",
+    "run_as_user": "root"
+  },
+  "logs": {
+    "logs_collected": {
+      "files": {
+        "collect_list": [
+          {
+            "file_path": "/var/log/fastapi.log",
+            "log_group_name": "${cloudwatch_log_group_name}",
+            "log_stream_name": "{instance_id}/fastapi",
+            "timezone": "UTC"
+          }
+        ]
+      }
+    }
+  }
+}
+EOF
+
+/opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl \
+  -a fetch-config -m ec2 \
+  -c file:/opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.json -s
 
 echo "Writing seed data to DB..." >> /home/ubuntu/start-script-log.txt
 sudo -u ubuntu env \
