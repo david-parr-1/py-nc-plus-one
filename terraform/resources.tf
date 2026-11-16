@@ -1,6 +1,7 @@
 locals {
   name_suffix = var.environment == "production" ? "" : "-${var.environment}"
   ssm_path    = var.environment == "production" ? "/nc-plus-one" : "/nc-plus-one/${var.environment}"
+  repo_branch = var.environment == "production" ? "main" : "${var.environment}"
 }
 
 data "aws_ami" "ubuntu" {
@@ -26,6 +27,8 @@ data "aws_ami" "ubuntu" {
 data "http" "myip" {
   url = "https://ipv4.icanhazip.com"
 }
+
+data "aws_region" "current" {}
 
 resource "aws_security_group" "ec2_ssh_sg" {
   name        = "ec2-ssh-sg${local.name_suffix}"
@@ -62,16 +65,25 @@ resource "aws_instance" "ec2_instance" {
     aws_ssm_parameter.db_secret_arn,
     aws_ssm_parameter.jwt_algorithm,
     aws_ssm_parameter.jwt_expiry_minutes,
-    aws_ssm_parameter.jwt_secret
+    aws_ssm_parameter.jwt_secret,
+    aws_iam_role_policy_attachment.cloudwatch_agent,
+    aws_cloudwatch_log_group.ec2_app
   ]
   instance_type               = "t3.micro"
   iam_instance_profile        = aws_iam_instance_profile.ec2_instance_profile.name
   associate_public_ip_address = true
-  security_groups             = [aws_security_group.ec2_ssh_sg.name, aws_security_group.ec2_http_sg.name]
-  key_name                    = "dp-key-pair"
+  security_groups = [
+    aws_security_group.ec2_ssh_sg.name,
+    aws_security_group.ec2_http_sg.name
+  ]
+  key_name = "dp-key-pair"
   user_data = templatefile("user_data.sh.tpl", {
-    ssm_parameter_prefix = "${local.ssm_path}"
+    ssm_parameter_prefix      = "${local.ssm_path}"
+    aws_region                = data.aws_region.current.region
+    cloudwatch_log_group_name = aws_cloudwatch_log_group.ec2_app.name
+    repo_branch               = "${local.repo_branch}"
   })
+  user_data_replace_on_change = true
 
   tags = {
     Name      = "AppServer${local.name_suffix}"
@@ -163,4 +175,9 @@ resource "aws_ssm_parameter" "jwt_algorithm" {
   name  = "${local.ssm_path}/JWT_ALGORITHM"
   type  = "String"
   value = var.jwt_algorithm
+}
+
+resource "aws_cloudwatch_log_group" "ec2_app" {
+  name              = "/nc-plus-one/${var.environment}/ec2"
+  retention_in_days = 30
 }
