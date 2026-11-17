@@ -120,7 +120,7 @@ jobs:
       TF_VAR_jwt_expiry_minutes: ${{ vars.TF_JWT_EXPIRY_MINUTES }}
       TF_VAR_jwt_algorithm: ${{ vars.TF_JWT_ALGORITHM }}
       TF_STATE_KEY: ${{ vars.TF_STATE_KEY }}
-      TF_VAR_LOGGING_LEVEL: ${{ vars.TF_LOGGING_LEVEL }}
+      TF_VAR_logging_level: ${{ vars.TF_LOGGING_LEVEL }}
 
     steps:
       - name: Checkout Repository
@@ -176,7 +176,7 @@ jobs:
       TF_VAR_jwt_expiry_minutes: ${{ vars.TF_JWT_EXPIRY_MINUTES }}
       TF_VAR_jwt_algorithm: ${{ vars.TF_JWT_ALGORITHM }}
       TF_STATE_KEY: ${{ vars.TF_STATE_KEY }}
-      TF_VAR_LOGGING_LEVEL: ${{ vars.TF_LOGGING_LEVEL }}
+      TF_VAR_logging_level: ${{ vars.TF_LOGGING_LEVEL }}
 
     steps:
       - name: Checkout Repository
@@ -229,7 +229,7 @@ jobs:
       TF_VAR_jwt_expiry_minutes: ${{ vars.TF_JWT_EXPIRY_MINUTES }}
       TF_VAR_jwt_algorithm: ${{ vars.TF_JWT_ALGORITHM }}
       TF_STATE_KEY: ${{ vars.TF_STATE_KEY }}
-      TF_VAR_LOGGING_LEVEL: ${{ vars.TF_LOGGING_LEVEL }}
+      TF_VAR_logging_level: ${{ vars.TF_LOGGING_LEVEL }}
 
     steps:
       - name: Checkout Repository

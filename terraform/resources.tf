@@ -82,6 +82,7 @@ resource "aws_instance" "ec2_instance" {
     aws_region                = data.aws_region.current.region
     cloudwatch_log_group_name = aws_cloudwatch_log_group.ec2_app.name
     repo_branch               = "${local.repo_branch}"
+    logging_level = var.logging_level
   })
   user_data_replace_on_change = true
 
