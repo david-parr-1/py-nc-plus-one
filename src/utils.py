@@ -7,6 +7,10 @@ from botocore.client import BaseClient
 from botocore.exceptions import BotoCoreError, ClientError
 from dotenv import load_dotenv
 
+from src.logging_config import get_logger
+
+logger = get_logger(__name__)
+
 load_dotenv()
 
 
@@ -35,6 +39,9 @@ def fetch_ssm_parameter(param_name: str, client: BaseClient = ssm_client) -> Any
         The value of the stored parameter.
     """
     try:
+        logger.info(
+            f"Attempting to retrieve value of AWS SSM parameter '{param_name}'..."
+        )
         response = client.get_parameter(
             Name=param_name,
             WithDecryption=True,
@@ -42,13 +49,14 @@ def fetch_ssm_parameter(param_name: str, client: BaseClient = ssm_client) -> Any
         parameter = response["Parameter"]["Value"]
         if parameter is None:
             raise ValueError("Secret not retrieved successfully")
+        logger.info(f"Successfully retrieved value of parameter '{param_name}'.")
         return parameter
 
     except (
         BotoCoreError,
         ClientError,
     ) as err:
-        print(f"Error retrieving AWS parameters: {err}")
+        logger.error(f"Error retrieving AWS SSM parameter '{param_name}': {err}")
         raise
 
 
@@ -65,12 +73,14 @@ def fetch_secret(secret_id: str, client: BaseClient = secretsmanager_client) -> 
         The returned secret value(s) parsed into a dictionary.
     """
     try:
+        logger.info("Attempting to retrieve secret value from AWS...")
         response = client.get_secret_value(SecretId=secret_id)
         secret = json.loads(response.get("SecretString"))
         if secret is None:
             raise ValueError("Secret not retrieved successfully")
+        logger.info("Secret value retrieved successfully.")
         return secret
 
     except (BotoCoreError, ClientError, ValueError) as err:
-        print(f"Error retrieving AWS secrets: {err}")
+        logger.error(f"Error retrieving AWS secrets: {err}")
         raise
