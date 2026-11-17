@@ -9,6 +9,7 @@ from pydantic import BaseModel
 
 from auth.auth import create_access_token, hash_password, verify_password
 from db.connection import get_db_connection
+from src.logging_config import get_logger
 
 app = FastAPI()
 
@@ -22,6 +23,9 @@ class NewUserRequest(BaseModel):
     name: str
     email: str
     password: str
+
+
+logger = get_logger(__name__)
 
 
 DBConnection = Annotated[psycopg2.extensions.connection, Depends(get_db_connection)]
@@ -44,6 +48,7 @@ def healthcheck():
 
 @app.get("/api/events")
 def get_events(conn: DBConnection):
+    logger.info("Getting all events...")
     with conn.cursor() as cur:
         cur.execute(
             """
@@ -62,11 +67,13 @@ def get_events(conn: DBConnection):
         rows = cur.fetchall()
 
     results_list = [dict(zip(keys, row)) for row in rows]
+    logger.info(f"{len(rows)} events returned successfully.")
     return {"events": results_list}
 
 
 @app.get("/api/events/{event_id}")
 def get_event(event_id: int, conn: DBConnection):
+    logger.info(f"Retrieving event id {event_id}...")
     with conn.cursor() as cur:
         cur.execute(
             """
@@ -89,6 +96,7 @@ def get_event(event_id: int, conn: DBConnection):
         row = cur.fetchone()
 
     if row is None:
+        logger.warning(f"Event id {event_id} could not be found.")
         raise HTTPException(status_code=404, detail="Event not found")
 
     event_data = {
@@ -102,6 +110,7 @@ def get_event(event_id: int, conn: DBConnection):
         "capacity": row[7],
         "created_at": row[8],
     }
+    logger.info(f"Event id {event_id} returned successfully.")
     return {"event": event_data}
 
 
@@ -112,6 +121,7 @@ def login_user(
 ):
     # Retrieve the user's hashed password from the users table to enable password
     # verification
+    logger.info(f"Logging in user {payload.email}...")
     with conn.cursor() as cur:
         cur.execute(
             """
@@ -124,9 +134,14 @@ def login_user(
         # the users table or where the email address is in the users table but
         # the passwords do not match
         if user is None or not verify_password(payload.password, user[1]):
+            logger.warning(
+                f"User {payload.email} could not be logged in: user does not "
+                f"exist or password is invalid."
+            )
             raise HTTPException(status_code=401, detail="Invalid email or password")
 
         token = create_access_token(user[2])
+        logger.info(f"User {payload.email} logged in successfully.")
         return {"token": token}
 
 
@@ -135,6 +150,7 @@ def register_user(
     payload: NewUserRequest,
     conn: DBConnection,
 ):
+    logger.info(f"Attempting to register new user {payload.email}...")
     hashed_password = hash_password(payload.password)
     created_at = datetime.now(UTC)
     with conn.cursor() as cur:
@@ -152,8 +168,10 @@ def register_user(
     conn.commit()
 
     if created_user is None:
+        logger.warning(f"User {payload.email} already exists.")
         raise HTTPException(status_code=409, detail="Email already registered")
 
+    logger.info(f"Successfully register new user {payload.email}.")
     return {
         "user": {
             "id": created_user[0],

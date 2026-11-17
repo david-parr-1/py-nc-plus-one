@@ -24,3 +24,13 @@ variable "environment" {
     error_message = "environment must be staging or production"
   }
 }
+
+variable "logging_level" {
+  type        = string
+  description = "Logging level to set for Python scripts"
+
+  validation {
+    condition     = contains(["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"], var.logging_level)
+    error_message = "environment must be staging or production"
+  }
+}

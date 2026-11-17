@@ -3,13 +3,17 @@ import os
 from botocore.exceptions import BotoCoreError, ClientError
 from dotenv import load_dotenv
 
+from src.logging_config import get_logger
 from src.utils import fetch_secret, fetch_ssm_parameter
+
+logger = get_logger(__name__)
 
 
 class DBConfig:
     _instance: "DBConfig | None" = None
 
     def __init__(self) -> None:
+        logger.info("Retrieving database configuration...")
         load_dotenv()
         try:
             self.aws_region = os.getenv("AWS_REGION", "eu-west-2")
@@ -28,10 +32,10 @@ class DBConfig:
             self.db_password = os.getenv("DB_PASSWORD") or fetch_secret(
                 self._db_secret_arn
             ).get("password")
-            print("DB Configuration initialised successfully.")
+            logger.info("DB Configuration initialised successfully.")
 
         except (BotoCoreError, ClientError) as err:
-            print(f"DB Configuration did not initialise successfully: {err}")
+            logger.error(f"DB Configuration did not initialise successfully: {err}")
             raise
 
     def get_parameter_name(self, parameter: str) -> str:
@@ -48,6 +52,7 @@ class JWTConfig:
     _instance: "JWTConfig | None" = None
 
     def __init__(self) -> None:
+        logger.info("Retrieving JWT configuration...")
         load_dotenv()
         try:
             self.ssm_parameter_prefix = os.getenv(
@@ -62,10 +67,10 @@ class JWTConfig:
             self.jwt_secret = os.getenv("JWT_SECRET") or self.get_parameter_name(
                 "JWT_SECRET"
             )
-            print("JWT Configuration initialised successfully.")
+            logger.info("JWT Configuration initialised successfully.")
 
         except (BotoCoreError, ClientError) as err:
-            print(f"JWT Configuration did not initialise successfully: {err}")
+            logger.error(f"JWT Configuration did not initialise successfully: {err}")
             raise
 
     def get_parameter_name(self, parameter: str) -> str:

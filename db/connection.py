@@ -4,6 +4,9 @@ import psycopg2
 from psycopg2.extensions import connection
 
 from db.configuration import DBConfig
+from src.logging_config import get_logger
+
+logger = get_logger(__name__)
 
 
 def get_db_connection() -> Generator[psycopg2.extensions.connection, None, None]:
@@ -14,6 +17,7 @@ def get_db_connection() -> Generator[psycopg2.extensions.connection, None, None]
 
     try:
         config = DBConfig.get_config()
+        logger.info("Attempting to connect to database...")
         conn = psycopg2.connect(
             dbname=config.db_name,
             host=config.db_host,
@@ -22,6 +26,7 @@ def get_db_connection() -> Generator[psycopg2.extensions.connection, None, None]
             password=config.db_password,
         )
 
+        logger.info(f"Successfully connected to database '{config.db_name}'.")
         yield conn
 
     finally:
@@ -31,6 +36,7 @@ def get_db_connection() -> Generator[psycopg2.extensions.connection, None, None]
 
 def create_db_connection() -> connection:
     config = DBConfig.get_config()
+    logger.info("Attempting to connect to database...")
     return psycopg2.connect(
         dbname=config.db_name,
         host=config.db_host,

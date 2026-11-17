@@ -49,6 +49,7 @@ Group=ubuntu
 WorkingDirectory=/home/ubuntu/py-nc-plus-one
 Environment=PYTHONPATH=/home/ubuntu/py-nc-plus-one
 Environment=SSM_PARAMETER_PREFIX="${ssm_parameter_prefix}"
+Environment=LOGGING_LEVEL="${logging_level}"
 ExecStart=/home/ubuntu/py-nc-plus-one/.venv/bin/uvicorn \
   main:app --host 0.0.0.0 --port 8000
 Restart=on-failure
@@ -101,6 +102,7 @@ echo "Writing seed data to DB..." >> /home/ubuntu/start-script-log.txt
 sudo -u ubuntu env \
   PYTHONPATH="$TARGET_DIR" \
   SSM_PARAMETER_PREFIX="${ssm_parameter_prefix}" \
+  LOGGING_LEVEL="${logging_level}" \
   "$TARGET_DIR/.venv/bin/python" \
   "$TARGET_DIR/db/seed_database.py"
 
