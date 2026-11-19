@@ -342,3 +342,69 @@ def test_add_rsvp_returns_error_404_for_non_existent_event(client, mock_valid_to
 
     assert response.status_code == 404
     assert response.json()["detail"] == "Event not found"
+
+
+def test_delete_rsvp_returns_status_code_204_for_successful_deletion(
+    client, mock_valid_token, rsvp_table_with_dupe
+):
+    attendee_id = rsvp_table_with_dupe["attendee_id"]
+    event_id = rsvp_table_with_dupe["event_id"]
+    conn = rsvp_table_with_dupe["conn"]
+
+    response = client.delete(
+        f"/api/events/{event_id}/rsvp/me",
+        headers={"Authorization": f"Bearer {mock_valid_token}"},
+    )
+
+    assert response.status_code == 204
+
+    with conn.cursor() as cur:
+        query = """
+        SELECT id
+        FROM rsvps
+        WHERE attendee_id = %s AND event_id = %s;
+        """
+
+        cur.execute(query, (attendee_id, event_id))
+
+        assert cur.fetchone() is None
+
+
+def test_delete_rsvp_returns_error_404_for_non_existent_event(
+    client, mock_valid_token, rsvp_table_clean
+):
+    event_id = rsvp_table_clean["event_id"]
+
+    response = client.delete(
+        f"/api/events/{event_id}/rsvp/me",
+        headers={"Authorization": f"Bearer {mock_valid_token}"},
+    )
+
+    assert response.status_code == 404
+    assert response.json()["detail"] == ("RSVP not found")
+
+
+def test_delete_rsvp_returns_error_401_for_invalid_token(
+    client, mock_invalid_token, rsvp_table_with_dupe
+):
+    event_id = rsvp_table_with_dupe["event_id"]
+    response = client.delete(
+        f"/api/events/{event_id}/rsvp/me",
+        headers={"Authorization": f"Bearer {mock_invalid_token}"},
+    )
+
+    assert response.status_code == 401
+    assert response.json()["detail"] == "Token is invalid"
+
+
+def test_delete_rsvp_returns_error_401_for_expired_token(
+    client, mock_expired_token, rsvp_table_with_dupe
+):
+    event_id = rsvp_table_with_dupe["event_id"]
+    response = client.delete(
+        f"/api/events/{event_id}/rsvp/me",
+        headers={"Authorization": f"Bearer {mock_expired_token}"},
+    )
+
+    assert response.status_code == 401
+    assert response.json()["detail"] == "Token has expired"
