@@ -232,3 +232,45 @@ def add_rsvp(
     }
 
     return payload
+
+
+@app.delete("/api/events/{event_id}/rsvp/me", status_code=status.HTTP_204_NO_CONTENT)
+def delete_rsvp(conn: DBConnection, event_id: int, user: int = Depends(get_user_id)):
+    logger.info(
+        f"Attempting to verify existence of RSVP for attendee_id: {user} and "
+        f"event_id: {event_id}..."
+    )
+    with conn.cursor() as cur:
+        cur.execute(
+            "SELECT id FROM rsvps WHERE attendee_id = %s AND event_id = %s;",
+            (user, event_id),
+        )
+
+        result = cur.fetchone()
+
+        if result is None:
+            logger.error(
+                f"RSVP not found for attendee_id: {user} and event_id: {event_id}"
+            )
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="RSVP not found"
+            )
+
+        rsvp_id = result[0]
+        logger.info(
+            f"RSVP id: {rsvp_id} found for attendee_id: {user} and event_id: {event_id}"
+        )
+
+        logger.info(
+            f"Attempting to delete RSVP id: {rsvp_id} for attendee_id: {user} and "
+            f"event_id: {event_id}"
+        )
+
+        cur.execute("DELETE FROM rsvps WHERE id = %s;", (rsvp_id,))
+
+        conn.commit()
+
+    logger.info(
+        f"Successfully deleted RSVP id: {rsvp_id} for attendee_id: {user} and "
+        f"event_id: {event_id}"
+    )
