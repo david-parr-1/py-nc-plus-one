@@ -189,6 +189,14 @@ def add_rsvp(
     user: int = Depends(get_user_id),
 ) -> dict[str, dict[str, Any]]:
     with conn.cursor() as cur:
+        cur.execute("SELECT * FROM events WHERE id = %s;", (event_id,))
+
+        if cur.fetchone() is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Event not found",
+            )
+
         logger.info(
             f"Attempting to write RSVP for user: {user} and event: {event_id} to "
             f"database..."

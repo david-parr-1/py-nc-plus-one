@@ -349,3 +349,34 @@ def mock_expired_token(test_jwt_config):
     )
 
     return token
+
+
+@pytest.fixture(scope="function")
+def rsvp_table_clean(add_test_data):
+    attendee_id = 1
+    event_id = 1
+
+    with add_test_data.cursor() as cur:
+        cur.execute(
+            "DELETE FROM rsvps WHERE attendee_id = %s AND event_id = %s;",
+            (attendee_id, event_id),
+        )
+    add_test_data.commit()
+    return {"conn": add_test_data, "attendee_id": attendee_id, "event_id": event_id}
+
+
+@pytest.fixture(scope="function")
+def rsvp_table_with_dupe(rsvp_table_clean):
+    conn = rsvp_table_clean["conn"]
+    attendee_id = rsvp_table_clean["attendee_id"]
+    event_id = rsvp_table_clean["event_id"]
+
+    with conn.cursor() as cur:
+        cur.execute(
+            "INSERT INTO rsvps (attendee_id, event_id) VALUES (%s, %s);",
+            (attendee_id, event_id),
+        )
+
+    conn.commit()
+
+    return {"conn": conn, "attendee_id": attendee_id, "event_id": event_id}
