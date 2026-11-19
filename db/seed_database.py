@@ -106,7 +106,9 @@ def create_rsvps_table(connection):
                 id SERIAL PRIMARY KEY,
                 attendee_id INTEGER REFERENCES users(id),
                 event_id INTEGER REFERENCES events(id),
-                created_at TIMESTAMPTZ DEFAULT NOW()
+                created_at TIMESTAMPTZ DEFAULT NOW(),
+                CONSTRAINT rsvps_attendee_event_unique
+                    UNIQUE (attendee_id, event_id)
             );
             """
         )

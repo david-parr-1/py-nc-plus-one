@@ -226,3 +226,119 @@ def test_register_user_returns_status_201_for_successful_registration(
 
     assert response.status_code == 201
     assert response.json() == expected_response
+
+
+def test_add_rsvp_returns_created_rsvp(client, mock_valid_token, rsvp_table_clean):
+    conn = rsvp_table_clean["conn"]
+    attendee_id = rsvp_table_clean["attendee_id"]
+    event_id = rsvp_table_clean["event_id"]
+
+    try:
+        response = client.post(
+            f"/api/events/{event_id}/rsvp",
+            headers={"Authorization": f"Bearer {mock_valid_token}"},
+        )
+
+        assert response.status_code == 201
+
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT id, created_at
+                FROM rsvps
+                WHERE attendee_id = %s AND event_id = %s;
+                """,
+                (attendee_id, event_id),
+            )
+            created_rsvp = cur.fetchone()
+
+        assert created_rsvp is not None
+
+        expected_response = {
+            "rsvp": {
+                "id": created_rsvp[0],
+                "attendee_id": attendee_id,
+                "event_id": event_id,
+                "created_at": created_rsvp[1],
+            }
+        }
+
+        response_body = response.json()
+
+        # Timestamp in response_body is converted to datetime object
+        # for cleaner comparison with created_rsvp[1] which is returned
+        # from the database as a datetime object.
+        response_body["rsvp"]["created_at"] = datetime.fromisoformat(
+            response_body["rsvp"]["created_at"]
+        )
+
+        assert response_body == expected_response
+
+    finally:
+        with conn.cursor() as cur:
+            cur.execute(
+                "DELETE FROM rsvps WHERE attendee_id = %s AND event_id = %s;",
+                (attendee_id, event_id),
+            )
+        conn.commit()
+
+
+def test_add_rsvp_rejects_duplicated_rsvp(
+    client, mock_valid_token, rsvp_table_with_dupe
+):
+    try:
+        conn = rsvp_table_with_dupe["conn"]
+        attendee_id = rsvp_table_with_dupe["attendee_id"]
+        event_id = rsvp_table_with_dupe["event_id"]
+
+        response = client.post(
+            f"/api/events/{event_id}/rsvp",
+            headers={"Authorization": f"Bearer {mock_valid_token}"},
+        )
+
+        assert response.status_code == 409
+        assert response.json()["detail"] == "RSVP already registered"
+
+    finally:
+        with conn.cursor() as cur:
+            cur.execute(
+                "DELETE FROM rsvps WHERE attendee_id = %s AND event_id = %s;",
+                (attendee_id, event_id),
+            )
+        conn.commit()
+
+
+def test_add_rsvp_returns_error_401_for_invalid_token(
+    client, mock_invalid_token, rsvp_table_with_dupe
+):
+    event_id = rsvp_table_with_dupe["event_id"]
+    response = client.post(
+        f"/api/events/{event_id}/rsvp",
+        headers={"Authorization": f"Bearer {mock_invalid_token}"},
+    )
+
+    assert response.status_code == 401
+    assert response.json()["detail"] == "Token is invalid"
+
+
+def test_add_rsvp_returns_error_401_for_expired_token(
+    client, mock_expired_token, rsvp_table_with_dupe
+):
+    event_id = rsvp_table_with_dupe["event_id"]
+    response = client.post(
+        f"/api/events/{event_id}/rsvp",
+        headers={"Authorization": f"Bearer {mock_expired_token}"},
+    )
+
+    assert response.status_code == 401
+    assert response.json()["detail"] == "Token has expired"
+
+
+def test_add_rsvp_returns_error_404_for_non_existent_event(client, mock_valid_token):
+    response = client.post(
+        "/api/events/9999/rsvp",
+        headers={"Authorization": f"Bearer {mock_valid_token}"},
+    )
+
+    assert response.status_code == 404
+    assert response.json()["detail"] == "Event not found"
