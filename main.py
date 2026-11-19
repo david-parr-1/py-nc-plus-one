@@ -1,5 +1,5 @@
 from datetime import UTC, datetime
-from typing import Annotated
+from typing import Annotated, Any
 
 import psycopg2
 from fastapi import Depends, FastAPI, HTTPException, Request, status
@@ -7,7 +7,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
-from auth.auth import create_access_token, hash_password, verify_password
+from auth.auth import create_access_token, get_user_id, hash_password, verify_password
 from db.connection import get_db_connection
 from src.logging_config import get_logger
 
@@ -180,3 +180,43 @@ def register_user(
             "created_at": created_user[3],
         }
     }
+
+
+@app.post("/api/events/{event_id}/rsvp", status_code=status.HTTP_201_CREATED)
+def add_rsvp(
+    conn: DBConnection,
+    event_id: int,
+    user: int = Depends(get_user_id),
+) -> dict[str, dict[str, Any]]:
+    with conn.cursor() as cur:
+        logger.info(
+            f"Attempting to write RSVP for user: {user} and event: {event_id} to "
+            f"database..."
+        )
+        query = """
+        INSERT INTO rsvps (attendee_id, event_id)
+        VALUES(%s, %s)
+        ON CONFLICT (attendee_id, event_id) DO NOTHING
+        RETURNING id, created_at;
+        """
+
+        cur.execute(query, (user, event_id))
+        rsvp_attributes = cur.fetchone()
+
+        conn.commit()
+
+    if rsvp_attributes is None:
+        logger.warning(f"RSVP already exists for user {user} and event {event_id}.")
+        raise HTTPException(status_code=409, detail="RSVP already registered")
+
+    logger.info(f"Successfully created RSVP for user {user} for event {event_id}.")
+    payload = {
+        "rsvp": {
+            "id": rsvp_attributes[0],
+            "attendee_id": user,
+            "event_id": event_id,
+            "created_at": rsvp_attributes[1],
+        }
+    }
+
+    return payload

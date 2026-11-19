@@ -1,8 +1,9 @@
 import json
 import os
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 import boto3
+import jwt
 import psycopg2
 import pytest
 from dotenv import load_dotenv
@@ -102,7 +103,9 @@ def create_db_schema(postgres_connection):
                 id SERIAL PRIMARY KEY,
                 attendee_id INTEGER REFERENCES users(id),
                 event_id INTEGER REFERENCES events(id),
-                created_at TIMESTAMPTZ DEFAULT NOW()
+                created_at TIMESTAMPTZ DEFAULT NOW(),
+                CONSTRAINT rsvps_attendee_event_unique
+                    UNIQUE (attendee_id, event_id)
             );
             """
         )
@@ -258,7 +261,8 @@ def user_with_hashed_password(add_test_data):
 
     # Teardown
     with conn.cursor() as cur:
-        cur.execute("TRUNCATE TABLE users RESTART IDENTITY CASCADE;")
+        # cur.execute("TRUNCATE TABLE users RESTART IDENTITY CASCADE;")
+        cur.execute("DELETE FROM users WHERE id = %s", (created_user_id,))
     conn.commit()
 
 
@@ -318,3 +322,30 @@ def test_jwt_config(monkeypatch):
 
     monkeypatch.setattr(JWTConfig, "_instance", None)
     return JWTConfig.get_config()
+
+
+@pytest.fixture(scope="function")
+def mock_valid_token(test_jwt_config):
+    token = jwt.encode(
+        {"sub": "1", "exp": datetime.now(UTC) + timedelta(minutes=1)},
+        test_jwt_config.jwt_secret,
+        algorithm=test_jwt_config.jwt_algorithm,
+    )
+
+    return token
+
+
+@pytest.fixture(scope="function")
+def mock_invalid_token(test_jwt_config):
+    return "test_token"
+
+
+@pytest.fixture(scope="function")
+def mock_expired_token(test_jwt_config):
+    token = jwt.encode(
+        {"sub": "1", "exp": datetime.now(UTC) - timedelta(minutes=1)},
+        test_jwt_config.jwt_secret,
+        algorithm=test_jwt_config.jwt_algorithm,
+    )
+
+    return token

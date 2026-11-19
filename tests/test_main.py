@@ -226,3 +226,60 @@ def test_register_user_returns_status_201_for_successful_registration(
 
     assert response.status_code == 201
     assert response.json() == expected_response
+
+
+def test_add_rsvp_returns_created_rsvp(client, mock_valid_token, add_test_data):
+    attendee_id = 1
+    event_id = 1
+
+    with add_test_data.cursor() as cur:
+        cur.execute(
+            "DELETE FROM rsvps WHERE attendee_id = %s AND event_id = %s;",
+            (attendee_id, event_id),
+        )
+    add_test_data.commit()
+
+    try:
+        response = client.post(
+            f"/api/events/{event_id}/rsvp",
+            headers={"Authorization": f"Bearer {mock_valid_token}"},
+        )
+
+        assert response.status_code == 201
+
+        with add_test_data.cursor() as cur:
+            cur.execute(
+                """
+                SELECT id, created_at
+                FROM rsvps
+                WHERE attendee_id = %s AND event_id = %s;
+                """,
+                (attendee_id, event_id),
+            )
+            created_rsvp = cur.fetchone()
+
+        assert created_rsvp is not None
+
+        expected_response = {
+            "rsvp": {
+                "id": created_rsvp[0],
+                "attendee_id": attendee_id,
+                "event_id": event_id,
+                "created_at": created_rsvp[1],
+            }
+        }
+
+        response_body = response.json()
+        response_body["rsvp"]["created_at"] = datetime.fromisoformat(
+            response_body["rsvp"]["created_at"]
+        )
+
+        assert response_body == expected_response
+
+    finally:
+        with add_test_data.cursor() as cur:
+            cur.execute(
+                "DELETE FROM rsvps WHERE attendee_id = %s AND event_id = %s;",
+                (attendee_id, event_id),
+            )
+        add_test_data.commit()
