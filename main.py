@@ -5,7 +5,7 @@ import psycopg2
 from fastapi import Depends, FastAPI, HTTPException, Request, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, StrictInt, field_validator
 
 from auth.auth import create_access_token, get_user_id, hash_password, verify_password
 from db.connection import get_db_connection
@@ -25,6 +25,25 @@ class NewUserRequest(BaseModel):
     password: str
 
 
+class NewEvent(BaseModel):
+    title: str
+    description: str
+    starts_at: datetime
+    ends_at: datetime
+    venue_id: StrictInt
+
+    @field_validator("starts_at", "ends_at", mode="before")
+    @classmethod
+    def validate_iso8601_datetime(cls, value: object) -> datetime:
+        if not isinstance(value, str) or "T" not in value:
+            raise ValueError("must be an ISO 8601 datetime string")
+
+        try:
+            return datetime.fromisoformat(value)
+        except ValueError:
+            raise ValueError("must be a valid ISO 8601 datetime string")
+
+
 logger = get_logger(__name__)
 
 
@@ -36,8 +55,13 @@ def handle_request_validation_error(request: Request, exc: RequestValidationErro
     # This exception handler intercepts validations errors which arise from Pydantic data validation
     # of the incoming request. FastAPI rejects these with code 422 by default. This handler
     # intecepts those erros and returns code 400 BAD REQUEST instead.
+    errors = [
+        {key: value for key, value in error.items() if key not in {"input", "ctx"}}
+        for error in exc.errors()
+    ]
+
     return JSONResponse(
-        status_code=status.HTTP_400_BAD_REQUEST, content={"error": exc.errors()}
+        status_code=status.HTTP_400_BAD_REQUEST, content={"error": errors}
     )
 
 
@@ -274,3 +298,57 @@ def delete_rsvp(conn: DBConnection, event_id: int, user: int = Depends(get_user_
         f"Successfully deleted RSVP id: {rsvp_id} for attendee_id: {user} and "
         f"event_id: {event_id}"
     )
+
+
+@app.post("/api/events", status_code=status.HTTP_201_CREATED)
+def create_event(
+    conn: DBConnection,
+    payload: NewEvent,
+    user: int = Depends(get_user_id),
+):
+    # Verify that the venue_id in the JSON data exists in the venues table before
+    # going any further.
+    with conn.cursor() as cur:
+        cur.execute("SELECT 1 FROM venues WHERE id = %s;", (payload.venue_id,))
+
+        if cur.fetchone is None:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST, detail="venue_id not found"
+            )
+
+        query = """
+        INSERT INTO events (title, description, starts_at, ends_at, organiser_id, venue_id)
+        VALUES (%s, %s, %s, %s, %s, %s)
+        RETURNING id, title, description, starts_at, ends_at, venue_id, organiser_id, created_at;
+        """
+        cur.execute(
+            query,
+            (
+                payload.title,
+                payload.description,
+                payload.starts_at,
+                payload.ends_at,
+                user,
+                payload.venue_id,
+            ),
+        )
+        new_event = cur.fetchone() if cur.fetchone is not None else None
+        if new_event is None:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Database error",
+            )
+    conn.commit()
+
+    return {
+        "event": {
+            "id": new_event[0],
+            "title": new_event[1],
+            "description": new_event[2],
+            "starts_at": new_event[3],
+            "ends_at": new_event[4],
+            "venue_id": new_event[5],
+            "organiser_id": new_event[6],
+            "created_at": new_event[7],
+        }
+    }

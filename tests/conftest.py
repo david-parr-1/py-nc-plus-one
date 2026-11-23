@@ -380,3 +380,14 @@ def rsvp_table_with_dupe(rsvp_table_clean):
     conn.commit()
 
     return {"conn": conn, "attendee_id": attendee_id, "event_id": event_id}
+
+
+@pytest.fixture(scope="function")
+def mock_new_event(add_test_data):
+    return {
+        "title": "test title",
+        "description": "test description",
+        "starts_at": datetime(2026, 11, 23, 9, 0, 0, tzinfo=UTC).isoformat(),
+        "ends_at": datetime(2026, 11, 23, 17, 0, 0, tzinfo=UTC).isoformat(),
+        "venue_id": 1,
+    }
