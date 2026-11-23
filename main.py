@@ -5,7 +5,7 @@ import psycopg2
 from fastapi import Depends, FastAPI, HTTPException, Request, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel, StrictInt
+from pydantic import BaseModel, StrictInt, field_validator
 
 from auth.auth import create_access_token, get_user_id, hash_password, verify_password
 from db.connection import get_db_connection
@@ -32,6 +32,17 @@ class NewEvent(BaseModel):
     ends_at: datetime
     venue_id: StrictInt
 
+    @field_validator("starts_at", "ends_at", mode="before")
+    @classmethod
+    def validate_iso8601_datetime(cls, value: object) -> datetime:
+        if not isinstance(value, str) or "T" not in value:
+            raise ValueError("must be an ISO 8601 datetime string")
+
+        try:
+            return datetime.fromisoformat(value)
+        except ValueError:
+            raise ValueError("must be a valid ISO 8601 datetime string")
+
 
 logger = get_logger(__name__)
 
@@ -45,7 +56,7 @@ def handle_request_validation_error(request: Request, exc: RequestValidationErro
     # of the incoming request. FastAPI rejects these with code 422 by default. This handler
     # intecepts those erros and returns code 400 BAD REQUEST instead.
     errors = [
-        {key: value for key, value in error.items() if key != "input"}
+        {key: value for key, value in error.items() if key not in {"input", "ctx"}}
         for error in exc.errors()
     ]
 
@@ -289,7 +300,7 @@ def delete_rsvp(conn: DBConnection, event_id: int, user: int = Depends(get_user_
     )
 
 
-@app.post("/api/events/", status_code=status.HTTP_201_CREATED)
+@app.post("/api/events", status_code=status.HTTP_201_CREATED)
 def create_event(
     conn: DBConnection,
     payload: NewEvent,
@@ -338,6 +349,6 @@ def create_event(
             "ends_at": new_event[4],
             "venue_id": new_event[5],
             "organiser_id": new_event[6],
-            "created_event": new_event[7],
+            "created_at": new_event[7],
         }
     }

@@ -408,3 +408,143 @@ def test_delete_rsvp_returns_error_401_for_expired_token(
 
     assert response.status_code == 401
     assert response.json()["detail"] == "Token has expired"
+
+
+def test_create_event_returns_status_code_201_for_successful_creation(
+    client, mock_valid_token, mock_new_event, add_test_data
+):
+    response = client.post(
+        "/api/events",
+        headers={"Authorization": f"Bearer {mock_valid_token}"},
+        json=mock_new_event,
+    )
+
+    assert response.status_code == 201
+
+    with add_test_data.cursor() as cur:
+        cur.execute(
+            """
+            SELECT
+                id,
+                created_at
+            FROM events
+            WHERE title = %s
+            AND description = %s;
+            """,
+            (mock_new_event["title"], mock_new_event["description"]),
+        )
+
+        result = cur.fetchone()
+
+    expected_response = {
+        "event": {
+            "id": result[0],
+            "title": mock_new_event["title"],
+            "description": mock_new_event["description"],
+            "starts_at": mock_new_event["starts_at"],
+            "ends_at": mock_new_event["ends_at"],
+            "venue_id": mock_new_event["venue_id"],
+            "organiser_id": 1,  # id 1 Maps to user_id in `mock_valid_token`,
+            "created_at": result[1].isoformat(),
+        }
+    }
+
+    assert response.json() == expected_response
+
+
+@pytest.mark.parametrize(
+    "missing_field", ["title", "description", "starts_at", "ends_at", "venue_id"]
+)
+def test_create_event_rejects_missing_field_in_payload(
+    missing_field, client, mock_valid_token, mock_new_event
+):
+    payload = mock_new_event
+    payload.pop(missing_field)
+    expected_response = {
+        "error": [
+            {"type": "missing", "loc": ["body", missing_field], "msg": "Field required"}
+        ]
+    }
+    response = client.post(
+        "/api/events",
+        headers={"Authorization": f"Bearer {mock_valid_token}"},
+        json=payload,
+    )
+
+    assert response.status_code == 400
+    assert response.json() == expected_response
+
+
+def test_create_event_rejects_invalid_formats(client, mock_valid_token):
+    payload = {
+        "title": 12345,
+        "description": 67890,
+        "starts_at": "2026-11-23",
+        "ends_at": 12345,
+        "venue_id": "test",
+    }
+
+    expected_response = {
+        "error": [
+            {
+                "type": "string_type",
+                "loc": ["body", "title"],
+                "msg": "Input should be a valid string",
+            },
+            {
+                "type": "string_type",
+                "loc": ["body", "description"],
+                "msg": "Input should be a valid string",
+            },
+            {
+                "type": "value_error",
+                "loc": ["body", "starts_at"],
+                "msg": "Value error, must be an ISO 8601 datetime string",
+            },
+            {
+                "type": "value_error",
+                "loc": ["body", "ends_at"],
+                "msg": "Value error, must be an ISO 8601 datetime string",
+            },
+            {
+                "type": "int_type",
+                "loc": ["body", "venue_id"],
+                "msg": "Input should be a valid integer",
+            },
+        ]
+    }
+
+    response = client.post(
+        "/api/events",
+        headers={"Authorization": f"Bearer {mock_valid_token}"},
+        json=payload,
+    )
+
+    assert response.status_code == 400
+    assert response.json() == expected_response
+
+
+def test_create_event_returns_error_401_for_invalid_token(
+    client, mock_invalid_token, mock_new_event
+):
+    response = client.post(
+        "/api/events",
+        headers={"Authorization": f"Bearer {mock_invalid_token}"},
+        json=mock_new_event,
+    )
+
+    assert response.status_code == 401
+    assert response.json()["detail"] == "Token is invalid"
+
+
+def test_create_event_returns_error_401_for_expired_token(
+    client, mock_expired_token, mock_new_event
+):
+    response = client.post(
+        "/api/events",
+        headers={"Authorization": f"Bearer {mock_expired_token}"},
+        json=mock_new_event,
+    )
+
+    assert response.status_code == 401
+    assert response.json()["detail"] == "Token has expired"
