@@ -5,6 +5,8 @@ import psycopg2
 from fastapi import Depends, FastAPI, HTTPException, Request, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
+from psycopg2 import sql
+from psycopg2.extras import RealDictCursor
 from pydantic import BaseModel, StrictInt, field_validator
 
 from auth.auth import create_access_token, get_user_id, hash_password, verify_password
@@ -35,6 +37,28 @@ class NewEvent(BaseModel):
     @field_validator("starts_at", "ends_at", mode="before")
     @classmethod
     def validate_iso8601_datetime(cls, value: object) -> datetime:
+        if not isinstance(value, str) or "T" not in value:
+            raise ValueError("must be an ISO 8601 datetime string")
+
+        try:
+            return datetime.fromisoformat(value)
+        except ValueError:
+            raise ValueError("must be a valid ISO 8601 datetime string")
+
+
+class UpdateEvent(BaseModel):
+    title: str | None = None
+    description: str | None = None
+    starts_at: datetime | None = None
+    ends_at: datetime | None = None
+    venue_id: StrictInt | None = None
+
+    @field_validator("starts_at", "ends_at", mode="before")
+    @classmethod
+    def validate_iso8601_datetime(cls, value: object) -> datetime | None:
+        if value is None:
+            return None
+
         if not isinstance(value, str) or "T" not in value:
             raise ValueError("must be an ISO 8601 datetime string")
 
@@ -352,3 +376,94 @@ def create_event(
             "created_at": new_event[7],
         }
     }
+
+
+@app.patch("/api/events/{event_id}")
+def update_event(
+    conn: DBConnection,
+    payload: UpdateEvent,
+    event_id: int,
+    user: int = Depends(get_user_id),
+):
+    logger.info(f"Attepting to retrieve details of event_id: {event_id}...")
+    with conn.cursor(cursor_factory=RealDictCursor) as cur:
+        cur.execute(
+            """
+            SELECT
+                starts_at,
+                ends_at,
+                organiser_id 
+            FROM events 
+            WHERE id = %s;
+            """,
+            (event_id,),
+        )
+
+        original_event = cur.fetchone()
+
+    if original_event is None:
+        logger.error(f"event_id: {event_id} could not be found.")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Event not found"
+        )
+
+    # Only the organiser of an event should be able to use this endpoint to
+    # modify it.
+    logger.info(f"Verifying user: {user} is organiser of event_id: {event_id}")
+    if user != original_event["organiser_id"]:
+        logger.error(f"User: {user} is not the organiser of event_id: {event_id}")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Must be event organiser to update event",
+        )
+
+    logger.info(f"User: {user} is the organiser of event_id: {event_id}")
+
+    # The ends_at timestamp of the event must be later than the starts_at timestamp.
+    starts_at = (
+        original_event["starts_at"] if payload.starts_at is None else payload.starts_at
+    )
+    ends_at = original_event["ends_at"] if payload.ends_at is None else payload.ends_at
+
+    logger.info("Validating ends_at timestamp...")
+    if ends_at <= starts_at:
+        logger.error(
+            f"ends_at timestamp: {ends_at} is earlier than starts_at timestamp: {starts_at}"
+        )
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="ends_at timestamp must be later than starts_at timestamp",
+        )
+
+    logger.info("ends_at timestamp is valid.")
+
+    updates = payload.model_dump(exclude_none=True)
+    logger.info("Verifying that the payload contains updates...")
+    if not updates:
+        logger.error("Payload contains no updates.")
+        raise HTTPException(status_code=400, detail="No fields to update")
+
+    logger.info("Payload contains updates.")
+
+    set_clause = sql.SQL(", ").join(
+        sql.SQL("{} = %s").format(sql.Identifier(field)) for field in updates
+    )
+    query = sql.SQL(
+        """
+        UPDATE events 
+        SET {} 
+        WHERE id = %s
+        RETURNING *;
+        """
+    ).format(set_clause)
+
+    logger.info(
+        f"Attempting to write update to event_id: {event_id} to events table..."
+    )
+    with conn.cursor(cursor_factory=RealDictCursor) as cur:
+        cur.execute(query, (*updates.values(), event_id))
+        updated_event = cur.fetchone()
+    conn.commit()
+    logger.info(f"Update to event_id: {event_id} written to events table successfully.")
+
+    return {"event": updated_event}
