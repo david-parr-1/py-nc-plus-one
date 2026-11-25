@@ -548,3 +548,68 @@ def test_create_event_returns_error_401_for_expired_token(
 
     assert response.status_code == 401
     assert response.json()["detail"] == "Token has expired"
+
+
+def test_update_event_succeeds_with_full_payload(
+    client, mock_valid_token, mock_pre_existing_event, mock_new_event
+):
+    event_id = mock_pre_existing_event["id"]
+    created_at = mock_pre_existing_event["created_at"]
+    payload = mock_new_event.copy()
+    # The fixture `mock_new_event` which is used to update the pre-existing record
+    # in the `events` table does not contain the `id`, `organiser_id` or `created_at`
+    # fields. They need to be added manually to `payload` here to enable comparison
+    # with the payload returned by `update_event()` since they are included in the
+    # return of `update_event()`. `organiser_id` value is set to 1 since this aligns
+    # with the `organiser_id` used to spin up `mock_valid_token.
+    expected_response = {
+        **payload,
+        "id": event_id,
+        "organiser_id": 1,
+        "created_at": created_at,
+    }
+
+    response = client.patch(
+        f"/api/events/{event_id}",
+        headers={"Authorization": f"Bearer {mock_valid_token}"},
+        json=payload,
+    )
+
+    assert response.status_code == 200
+    assert response.json()["event"] == expected_response
+
+
+@pytest.mark.parametrize(
+    "omitted_field", ["title", "description", "starts_at", "ends_at", "venue_id"]
+)
+def test_update_event_succeeds_with_omitted_optional_fields_in_payload(
+    omitted_field, client, mock_valid_token, mock_pre_existing_event, mock_new_event
+):
+    event_id = mock_pre_existing_event["id"]
+    created_at = mock_pre_existing_event["created_at"]
+    payload = mock_new_event.copy()
+    payload.pop(omitted_field)
+    # The fixture `mock_new_event` which is used to update the pre-existing record
+    # in the `events` table does not contain the `id`, `organiser_id` or `created_at`
+    # fields. They need to be added manually to `payload` here to enable comparison
+    # with the payload returned by `update_event()` since they are included in the
+    # return of `update_event()`. `organiser_id` value is set to 1 since this aligns
+    # with the `organiser_id` used to spin up `mock_valid_token. The `omitted_field`
+    # also needs to be added to the expected response since the endpoint will return
+    # this with the existing unmodified value.
+    expected_response = {
+        **payload,
+        "id": event_id,
+        "organiser_id": 1,
+        "created_at": created_at,
+        omitted_field: mock_pre_existing_event[omitted_field],
+    }
+
+    response = client.patch(
+        f"/api/events/{event_id}",
+        headers={"Authorization": f"Bearer {mock_valid_token}"},
+        json=payload,
+    )
+
+    assert response.status_code == 200
+    assert response.json()["event"] == expected_response
