@@ -336,6 +336,17 @@ def mock_valid_token(test_jwt_config):
 
 
 @pytest.fixture(scope="function")
+def mock_alternate_valid_token(test_jwt_config):
+    token = jwt.encode(
+        {"sub": "2", "exp": datetime.now(UTC) + timedelta(minutes=1)},
+        test_jwt_config.jwt_secret,
+        algorithm=test_jwt_config.jwt_algorithm,
+    )
+
+    return token
+
+
+@pytest.fixture(scope="function")
 def mock_invalid_token(test_jwt_config):
     return "test_token"
 
@@ -391,3 +402,61 @@ def mock_new_event(add_test_data):
         "ends_at": datetime(2026, 11, 23, 17, 0, 0, tzinfo=UTC).isoformat(),
         "venue_id": 1,
     }
+
+
+@pytest.fixture(scope="function")
+def mock_pre_existing_event(add_test_data):
+    pre_existing_event = {
+        "title": "Pre-existing event",
+        "description": "Pre-existing event",
+        "starts_at": datetime(2026, 11, 22, 9, 0, 0, tzinfo=UTC).isoformat(),
+        "ends_at": datetime(2026, 11, 24, 17, 0, 0, tzinfo=UTC).isoformat(),
+        "venue_id": 2,
+        "organiser_id": 1,
+    }
+
+    with add_test_data.cursor() as cur:
+        query = """
+        INSERT INTO events (
+            title, 
+            description, 
+            starts_at, 
+            ends_at, 
+            venue_id,
+            organiser_id
+        )
+        VALUES (
+            %(title)s, 
+            %(description)s, 
+            %(starts_at)s, 
+            %(ends_at)s, 
+            %(venue_id)s,
+            %(organiser_id)s
+        )
+        RETURNING
+            id,
+            title,
+            description,
+            starts_at,
+            ends_at,
+            organiser_id,
+            venue_id,
+            created_at;
+        """
+
+        cur.execute(query, pre_existing_event)
+        event_fields = [desc[0] for desc in cur.description]
+        # Date fields need to be converted to ISO 8601 format to enable comaparison
+        # with endpoint returns in unit tests.
+        event_details = [
+            attribute.isoformat() if isinstance(attribute, datetime) else attribute
+            for attribute in cur.fetchone()
+        ]
+        event = dict(zip(event_fields, event_details))
+
+    yield {
+        **event,
+        "conn": add_test_data,
+    }
+
+    add_test_data.rollback()
