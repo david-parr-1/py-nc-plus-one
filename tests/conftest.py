@@ -336,6 +336,17 @@ def mock_valid_token(test_jwt_config):
 
 
 @pytest.fixture(scope="function")
+def mock_alternate_valid_token(test_jwt_config):
+    token = jwt.encode(
+        {"sub": "2", "exp": datetime.now(UTC) + timedelta(minutes=1)},
+        test_jwt_config.jwt_secret,
+        algorithm=test_jwt_config.jwt_algorithm,
+    )
+
+    return token
+
+
+@pytest.fixture(scope="function")
 def mock_invalid_token(test_jwt_config):
     return "test_token"
 
