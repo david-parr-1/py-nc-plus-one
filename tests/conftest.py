@@ -9,7 +9,7 @@ import pytest
 from dotenv import load_dotenv
 from fastapi.testclient import TestClient
 from moto import mock_aws
-from psycopg2.extras import execute_values
+from psycopg2.extras import RealDictCursor, execute_values
 from testcontainers.community.postgres import PostgresContainer
 
 from auth.auth import hash_password
@@ -460,3 +460,32 @@ def mock_pre_existing_event(add_test_data):
     }
 
     add_test_data.rollback()
+
+
+@pytest.fixture(scope="function")
+def mock_attendees_list(mock_pre_existing_event):
+    conn = mock_pre_existing_event["conn"]
+    event_id = mock_pre_existing_event["id"]
+    with conn.cursor(cursor_factory=RealDictCursor) as cur:
+        cur.execute(
+            """
+            SELECT
+                id,
+                name,
+                email
+            FROM users;
+            """
+        )
+
+        mock_users = cur.fetchall()
+        print(type(mock_users))
+        mock_rsvps = [(event_id, user["id"]) for user in mock_users]
+        insert_query = """
+            INSERT INTO rsvps (event_id, attendee_id)
+            VALUES %s;
+            """
+        execute_values(cur, insert_query, mock_rsvps)
+
+    yield {"event_id": event_id, "attendees": mock_users}
+
+    conn.rollback()
