@@ -425,47 +425,12 @@ def update_event(
     conn: DBConnection,
     payload: UpdateEvent,
     event_id: int,
+    event: EventForOrganiser,
     user: int = Depends(get_user_id),
 ):
-    logger.info(f"Attepting to retrieve details of event_id: {event_id}...")
-    with conn.cursor(cursor_factory=RealDictCursor) as cur:
-        cur.execute(
-            """
-            SELECT
-                starts_at,
-                ends_at,
-                organiser_id 
-            FROM events 
-            WHERE id = %s;
-            """,
-            (event_id,),
-        )
-
-        original_event = cur.fetchone()
-
-    if original_event is None:
-        logger.error(f"event_id: {event_id} could not be found.")
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Event not found"
-        )
-
-    # Only the organiser of an event should be able to use this endpoint to
-    # modify it.
-    logger.info(f"Verifying user: {user} is organiser of event_id: {event_id}")
-    if user != original_event["organiser_id"]:
-        logger.error(f"User: {user} is not the organiser of event_id: {event_id}")
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Must be event organiser to update event",
-        )
-
-    logger.info(f"User: {user} is the organiser of event_id: {event_id}")
-
     # The ends_at timestamp of the event must be later than the starts_at timestamp.
-    starts_at = (
-        original_event["starts_at"] if payload.starts_at is None else payload.starts_at
-    )
-    ends_at = original_event["ends_at"] if payload.ends_at is None else payload.ends_at
+    starts_at = event["starts_at"] if payload.starts_at is None else payload.starts_at
+    ends_at = event["ends_at"] if payload.ends_at is None else payload.ends_at
 
     logger.info("Validating ends_at timestamp...")
     if ends_at <= starts_at:

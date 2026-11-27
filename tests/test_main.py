@@ -660,7 +660,7 @@ def test_update_event_rejects_when_authenticated_user_is_not_originator(
     )
 
     assert response.status_code == 403
-    assert response.json()["detail"] == "Must be event organiser to update event"
+    assert response.json()["detail"] == "Must be event organiser"
 
 
 def test_update_event_rejects_invalid_formats(
