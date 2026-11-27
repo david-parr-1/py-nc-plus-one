@@ -378,6 +378,48 @@ def create_event(
     }
 
 
+def get_event_for_organiser(
+    event_id: int, conn: DBConnection, user: Annotated[int, Depends(get_user_id)]
+) -> dict[str, Any]:
+    with conn.cursor(cursor_factory=RealDictCursor) as cur:
+        cur.execute(
+            """
+            SELECT *
+            FROM events
+            WHERE id = %s;
+            """,
+            (event_id,),
+        )
+
+        event = cur.fetchone()
+
+        logger.info(f"Attempting to retrieve data for event id: {event_id}...")
+        if event is None:
+            logger.error(f"Event id: {event_id} not found.")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="Event not found"
+            )
+        logger.info(f"Event id: {event_id} retrieved successfully.")
+
+        logger.info(
+            f"Validating that user id: {user} is organiser of event id: {event_id}..."
+        )
+        if user != event["organiser_id"]:
+            logger.error(
+                f"User id: {user} is not the organiser of event id: {event_id}."
+            )
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN, detail="Must be event organiser"
+            )
+
+        logger.info(f"User id: {user} is organiser of event id: {event_id}.")
+
+        return event
+
+
+EventForOrganiser = Annotated[dict[str, Any], Depends(get_event_for_organiser)]
+
+
 @app.patch("/api/events/{event_id}")
 def update_event(
     conn: DBConnection,
@@ -467,3 +509,26 @@ def update_event(
     logger.info(f"Update to event_id: {event_id} written to events table successfully.")
 
     return {"event": updated_event}
+
+
+@app.get("/api/events/{event_id}/attendees")
+def get_attendees(conn: DBConnection, event_id: int, event: EventForOrganiser):
+    logger.info(f"Attempting to retrieve list of attendees for event id: {event_id}")
+    with conn.cursor(cursor_factory=RealDictCursor) as cur:
+        cur.execute(
+            """
+            SELECT
+                r.attendee_id AS id,
+                u.name AS name,
+                u.email AS email
+            FROM rsvps AS r
+            INNER JOIN users AS u
+            ON r.attendee_id = u.id
+            WHERE r.event_id = %s;
+            """,
+            (event_id,),
+        )
+
+        attendees = cur.fetchall()
+
+    return {"attendees": attendees}

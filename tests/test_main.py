@@ -750,3 +750,73 @@ def test_update_event_rejects_end_date_earlier_than_start_date(
     assert response.json()["detail"] == (
         "ends_at timestamp must be later than starts_at timestamp"
     )
+
+
+def test_get_attendees_returns_attendees_with_successful_request(
+    client, mock_valid_token, mock_attendees_list
+):
+    event_id = mock_attendees_list["event_id"]
+    mock_attendees = [attendee for attendee in mock_attendees_list["attendees"]]
+    expected_response = {"attendees": mock_attendees}
+
+    response = client.get(
+        f"/api/events/{event_id}/attendees",
+        headers={"Authorization": f"Bearer {mock_valid_token}"},
+    )
+
+    assert response.status_code == 200
+    assert response.json() == expected_response
+
+
+def test_get_attendees_rejects_when_authenticated_user_is_not_originator(
+    client, mock_alternate_valid_token, mock_attendees_list
+):
+    event_id = mock_attendees_list["event_id"]
+
+    response = client.get(
+        f"/api/events/{event_id}/attendees",
+        headers={"Authorization": f"Bearer {mock_alternate_valid_token}"},
+    )
+
+    assert response.status_code == 403
+    assert response.json()["detail"] == "Must be event organiser"
+
+
+def test_get_attendees_returns_error_404_for_event_not_found(client, mock_valid_token):
+    event_id = 9999
+
+    response = client.get(
+        f"/api/events/{event_id}/attendees",
+        headers={"Authorization": f"Bearer {mock_valid_token}"},
+    )
+
+    assert response.status_code == 404
+    assert response.json()["detail"] == "Event not found"
+
+
+def test_get_attendees_returns_error_401_for_invalid_token(
+    client, mock_invalid_token, mock_attendees_list
+):
+    event_id = mock_attendees_list["event_id"]
+
+    response = client.get(
+        f"/api/events/{event_id}/attendees",
+        headers={"Authorization": f"Bearer {mock_invalid_token}"},
+    )
+
+    assert response.status_code == 401
+    assert response.json()["detail"] == "Token is invalid"
+
+
+def test_get_attendees_returns_error_401_for_expired_token(
+    client, mock_expired_token, mock_attendees_list
+):
+    event_id = mock_attendees_list["event_id"]
+
+    response = client.get(
+        f"/api/events/{event_id}/attendees",
+        headers={"Authorization": f"Bearer {mock_expired_token}"},
+    )
+
+    assert response.status_code == 401
+    assert response.json()["detail"] == "Token has expired"
